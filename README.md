@@ -1,11 +1,15 @@
 # RustNotePlusPlus
 
-使用 Rust 制作类似 Notepad++ 的桌面文本与代码编辑器。采用 Cargo workspace 拆分功能，通过动态库提供可扩展能力。
+A Rust desktop text and code editor inspired by Notepad++. Features are separated into a Cargo workspace, with extensions provided through dynamically loaded libraries.
 
-当前阶段：**架构与开发规划，尚无可运行编辑器**。本次不预先创建空 crate，也不宣称实现任何里程碑。
+Current status: **architecture and development planning; no runnable editor yet**. Empty placeholder crates have not been created, and no implementation milestone is complete.
 
-- [架构、技术选型与 workspace](docs/ARCHITECTURE.md)
-- [动态库插件协议](docs/PLUGIN_ABI.md)
-- [开发路线与验收标准](docs/ROADMAP.md)
+- [Architecture, technology choices, and workspace](docs/ARCHITECTURE.md)
+- [Dynamic library plugin protocol](docs/PLUGIN_ABI.md)
+- [Development roadmap and acceptance criteria](docs/ROADMAP.md)
 
-默认目标：Windows 10/11 x64 优先，随后适配 Linux/macOS；独立桌面程序，不依赖 WebView。独立实现类似体验，不承诺兼容 Notepad++ 的插件二进制。
+Initial target: Windows 10/11 x64, followed by Linux and macOS. The application runs as a standalone desktop program without a WebView. It independently implements a similar editing experience and does not promise binary compatibility with Notepad++ plugins.
+
+## Documentation language
+
+All project documentation must be written and maintained in English, including README files, architecture and design documents, development plans, contributor guides, and future documentation additions.

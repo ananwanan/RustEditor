@@ -1,48 +1,48 @@
-# 开发路线与验收
+# Development Roadmap and Acceptance Criteria
 
-当前所有里程碑均为待开发。先做 M0 技术验证，再冻结 GUI、依赖版本与 ABI；不根据规划宣称功能已完成。以下工作量为单人全职粗估，不是交付承诺。
+All milestones are currently pending. Complete M0 validation before freezing the GUI, dependency versions, and ABI. A plan does not imply implemented functionality. Estimates below are rough figures for one full-time developer, not delivery commitments.
 
-| 阶段 | 预计 | 交付与完成标准 |
+| Milestone | Estimate | Deliverables and completion criteria |
 |---|---|---|
-| M0 技术验证 | 1–2 周 | 建立 workspace、core/api/host/sdk/desktop/text-tools/xtask 最小链路；宿主动态加载示例 DLL 执行选区大写；无插件可运行；Windows 中文输入组合/候选定位、100%/150%/200% DPI、剪贴板及快捷键人工验收；GUI 和 ABI 形成决策记录 |
-| M1 基础编辑 | 2–4 周 | 文档模型、core 驱动视图、多标签、行号、选择、撤销重做、打开保存、修改标记与关闭确认；中文/emoji/组合字符、空文件、CRLF/LF、只读文件与保存失败测试；消除临时字符串控件与 core 的双状态 |
-| M2 日常文本能力 | 2–3 周 | 字面量/正则查找替换、查找下一个/上一个、替换全部单事务；UTF-8/BOM、UTF-16、GBK；编码不可表示提示；外部修改冲突；配置、快捷键、基础会话恢复；字节范围与 Unicode 边界回归 |
-| M3 代码编辑 | 3–5 周 | 增量语法高亮、缩进、括号匹配、折叠、自动缩进、分栏；首批 Rust/C/C++/JSON/TOML；后台解析可取消，不阻塞输入，旧版本结果不会覆盖新文档 |
-| M4 插件可用化 | 2–3 周 | 完整 manifest/启停 UI/日志/SDK 文档；行排序和大小写插件；ABI 兼容、错误插件、重复注册及退出清理验收；插件升级重启生效 |
-| M5 性能与可靠性 | 2–4 周 | 大文件模式、目录搜索、长行降级、恢复快照、损坏恢复文件、磁盘满与占用测试；公开可重复基准及已知限制 |
-| M6 首版发布 | 1–2 周 | Windows 便携包、版本信息、许可证清单、发布校验和；干净 Windows 实机完整使用验证；Linux/macOS 分别验证后才宣称支持 |
+| M0 Technical validation | 1–2 weeks | Create the minimal workspace/core/api/host/sdk/desktop/text-tools/xtask path; dynamically load an example DLL and uppercase a selection; run without plugins; manually validate Windows Chinese IME composition and candidate positioning, 100%/150%/200% DPI, clipboard behavior, and shortcuts; record GUI and ABI decisions |
+| M1 Basic editing | 2–4 weeks | Document model, core-driven view, tabs, line numbers, selection, undo/redo, open/save, modified state, and close confirmation; test Chinese/emoji/combining characters, empty files, CRLF/LF, read-only files, and save failures; remove duplicate mutable state between temporary string widgets and core |
+| M2 Everyday text features | 2–3 weeks | Literal/regex find and replace, next/previous match, and replace-all as one transaction; UTF-8/BOM, UTF-16, and GBK; unencodable-character prompts; external modification conflicts; configuration, shortcuts, and basic session recovery; byte-range and Unicode boundary regressions |
+| M3 Code editing | 3–5 weeks | Incremental highlighting, indentation, bracket matching, folding, automatic indentation, and split views; initial Rust/C/C++/JSON/TOML support; cancellable background parsing that does not block input or overwrite newer document results |
+| M4 Usable plugin management | 2–3 weeks | Complete manifests, enable/disable UI, logging, and SDK documentation; line-sorting and case-conversion plugins; validate ABI compatibility, invalid plugins, duplicate registrations, and exit cleanup; plugin updates take effect after restart |
+| M5 Performance and reliability | 2–4 weeks | Large-file mode, directory search, long-line degradation, recovery snapshots, corrupted recovery files, full disks, and file-lock tests; publish reproducible benchmarks and known limitations |
+| M6 Initial release | 1–2 weeks | Windows portable package, version information, license inventory, and release checksums; validate complete workflows on a clean physical Windows machine; claim Linux/macOS support only after separate validation |
 
-顺序依赖：M0 → M1 → M2 → M3 → M4 → M5 → M6。动态加载在 M0 即打通，M4 完成用户可用管理，不等最后才接入。
+Dependencies: M0 → M1 → M2 → M3 → M4 → M5 → M6. Dynamic loading is established in M0; M4 delivers user-facing management rather than introducing loading for the first time.
 
-## 性能预算（待 M0/M5 测量校准）
+## Performance Budgets (to Calibrate in M0/M5)
 
-统一使用 Windows 11 x64、4 核以上 CPU、16GB 内存、SSD 的记录机；记录具体型号、构建配置、冷/热启动和输入数据，不把预算写成实测结果。
+Use a recorded Windows 11 x64 test machine with at least four CPU cores, 16GB RAM, and an SSD. Record the exact hardware, build configuration, cold/warm startup conditions, and input data. Budgets are targets, not measurements.
 
-| 场景 | 初始预算 |
+| Scenario | Initial budget |
 |---|---|
-| 无插件空启动 | 热启动至可编辑 < 1 秒，空闲 RSS < 150 MiB |
-| 1 MiB UTF-8 普通文件 | 输入到绘制延迟 p95 < 16 ms |
-| 10 MiB / 100k 行文件 | 输入到绘制延迟 p95 < 33 ms，异步打开可取消 |
-| 100 MiB 日志 | 大文件受限模式打开 < 5 秒，总 RSS < 600 MiB；明确关闭或限制哪些能力 |
-| 超长单行/正则搜索 | UI 仍响应；任务可取消，禁止无界中间结果与无界布局 |
+| Empty startup without plugins | Warm startup to editable state < 1 second; idle RSS < 150 MiB |
+| Ordinary 1 MiB UTF-8 file | Input-to-render latency p95 < 16 ms |
+| 10 MiB / 100k-line file | Input-to-render latency p95 < 33 ms; cancellable asynchronous opening |
+| 100 MiB log | Restricted large-file mode opens in < 5 seconds with total RSS < 600 MiB; explicitly document disabled or limited capabilities |
+| Extremely long lines / regex search | UI remains responsive; tasks can be cancelled; no unbounded intermediate results or layout work |
 
-端到端延迟须测输入事件至帧呈现；只测 core 操作耗时不能代表用户体验。分别记录中文、emoji、CRLF、GBK、UTF-16、长行和重复替换负载。无法达到预算时记录原因与降级行为，不静默改变验收条件。
+Measure end-to-end latency from input events to frame presentation. Core operation timing alone does not represent the user experience. Record Chinese, emoji, CRLF, GBK, UTF-16, long-line, and repeated-replacement workloads separately. If a budget is missed, record the cause and fallback behavior rather than silently changing acceptance criteria.
 
-## 验证策略
+## Validation Strategy
 
-core：编辑/撤销/重做不变量、随机编辑与简单参考模型对照、Unicode 边界。file-io：编码往返、不可表示字符、外部改动、写失败原文件保留。search：跨 rope 块、零长度匹配、全选替换及取消。syntax：版本竞态。plugin：真实动态库装载及独立进程失败测试。UI：Windows IME、DPI、快捷键冲突、标签关闭、剪贴板与恢复人工记录；再逐平台扩展。
+Core: edit/undo/redo invariants, randomized edits compared with a simple reference model, and Unicode boundaries. File I/O: encoding round trips, unencodable characters, external changes, and preservation of originals after write failures. Search: cross-rope-chunk matches, zero-length matches, replace-all, and cancellation. Syntax: revision races. Plugins: real dynamic library loading and subprocess failure tests. UI: manual Windows IME, DPI, shortcut conflict, tab closing, clipboard, and recovery records, followed by platform-specific expansion.
 
-每阶段提交对应代码、必要测试、构建命令与实际验收证据；更新此表状态。单纯空 crate 或截图不构成完成。
+Each milestone must include implementation, necessary tests, build commands, actual acceptance evidence, and an updated milestone status. Empty crates or screenshots alone do not establish completion.
 
-## 下一次开发的具体任务
+## Concrete Tasks for the Next Development Session
 
-1. 建立 resolver=2 workspace 与上述 M0 最小成员，统一版本、edition、MSRV、lint，生成 Cargo.lock。
-2. 编写独立 core 的最小文档/选区事务与版本冲突校验。
-3. 定义 ABI v1 完整结构、大小/版本校验、SDK 包装和入口。
-4. text-tools 使用 cdylib，宿主使用 libloading；通过 xtask 把库和 manifest 放入开发插件目录。
-5. 桌面原型完成输入法、DPI 与命令调用验证，完成失败路径集成测试。
-6. 创建 main/PR 基础 CI，保存 Windows 手工验收结果；决定是否保留 GUI 选择后进入 M1。
+1. Create the resolver=2 workspace and minimal M0 members, share version/edition/MSRV/lint settings, and generate Cargo.lock.
+2. Implement independent core document/selection transactions and revision-conflict checks.
+3. Define complete ABI v1 structures, size/version validation, SDK wrappers, and the entry point.
+4. Build text-tools as a cdylib and load it with libloading; use xtask to stage the library and manifest in the development plugin directory.
+5. Validate desktop IME, DPI, and command invocation; implement failure-path integration tests.
+6. Create baseline main/PR CI, record Windows manual acceptance results, and decide whether to retain the GUI choice before M1.
 
-## 尚待后续决定
+## Decisions Still Open
 
-GUI 在 M0 后冻结；插件热卸载不纳入首版；精确支持的操作系统版本和发行包策略在实测后公布；项目许可证在正式发布前确定。插件 v1 仅承载文本命令，扩展 UI 以后采用宿主提供的声明式面板 API，不跨 DLL 传 GUI 对象。
+Freeze the GUI after M0. Hot unloading is outside the initial release. Publish exact supported OS versions and package policies after testing. Choose the project license before formal release. Plugin v1 supports text commands only; future UI extensions should use host-provided declarative panel APIs rather than passing GUI objects across DLL boundaries.
