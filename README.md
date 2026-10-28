@@ -2,7 +2,7 @@
 
 A Rust desktop text and code editor inspired by Notepad++. Features are separated into a Cargo workspace, with extensions provided through dynamically loaded libraries.
 
-Current status: **M0 prototype implemented; Windows manual acceptance is pending**. The native desktop, independent editing core, C ABI/SDK, real dynamic plugin host, text-tools extension, and development tooling are runnable. See the [M0 acceptance record](docs/acceptance/M0.md) for measured results and remaining gates. M0 is not marked complete.
+Current status: **M0 prototype implemented; acceptance remains incomplete**. Windows checks at 125% scale provide partial native evidence, and release idle memory has been measured. Microsoft Pinyin, native 100%/150%/200% DPI, complete font/input coverage, and actual startup/input-to-present performance remain pending. The native desktop, independent editing core, C ABI/SDK, real dynamic plugin host, text-tools extension, and development tooling are runnable. See the [M0 acceptance record](docs/acceptance/M0.md) for exact results and reproduction steps. M1 must wait for the mandatory M0 gates.
 
 - [Architecture, technology choices, and workspace](docs/ARCHITECTURE.md)
 - [Dynamic library plugin protocol](docs/PLUGIN_ABI.md)
