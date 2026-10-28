@@ -1,6 +1,18 @@
 # Architecture Plan
 
-Date: 2026-10-28. This is a proposed implementation plan. Dependency versions and the toolchain will be locked after validation in M0.
+Date: 2026-10-28. The M0 prototype now implements the desktop/core/api/sdk/host/text-tools/xtask path. Later workspace members below remain plans. Rust and dependency versions are locked for reproducible prototype builds; GUI and ABI acceptance remain provisional until the [M0 gates](acceptance/M0.md) pass.
+
+## M0 Implementation Decisions
+
+- Virtual resolver-2 workspace, Rust 1.88.0, edition 2024, shared metadata/lints, and committed Cargo.lock. No project license has been selected; no distributable release is claimed.
+- eframe/egui 0.33.3 with the native Glow backend; WebView/WASM backends are not used. This is a reproducible MSRV-compatible candidate, not a claim to use the newest release. Windows IME and DPI decide whether to retain it.
+- A bounded UTF-8 String is sufficient for the M0 transaction/ABI experiment. Ropey, virtualized layout, and large-file capability remain unvalidated. Maximum document size is 4 MiB, with 256 undo entries / 8 MiB of retained text deltas.
+- Document is authoritative. The TextBuffer adapter creates a draft only on a mutation during a widget call, validates it, commits one minimal core transaction at the end, then drops it. Failed/oversized paste rolls back the whole draft. TextEdit's independent undo snapshots are cleared each frame; shortcuts use core history. Drafts are synchronous transaction data, not a second persistent document model.
+- Core revisions start at 1 and increase on edits, undo, and redo. Selections use directed UTF-8 byte endpoints; the GUI adapter converts scalar indices. Full grapheme cursor behavior is a remaining view gate, not an achieved capability.
+- libloading 0.8.9 loads real cdylibs at startup. Host/SDK meet through the implemented v1.0 C tables in plugin-api; the desktop does not link the plugin crate. Explicit plugin installations and manifests gate loading; Windows uses DLL-directory + System32 search flags, Unix uses RTLD_NOW | RTLD_LOCAL.
+- The M0 command registry lives in plugin-host. A standalone commands crate and editor-view crate will be extracted when M1 needs shared routing/view responsibilities; no empty placeholders were created.
+- Rust FFI boundaries convert unwindable panics to fixed status values. Unknown native state or failed shutdown retains the library, host table, and context until process exit. Disabling only removes dispatch; updates require restart.
+- Native GUI verification, older released-SDK compatibility, performance budgets, safe file saving, and platform release support are not established by the current automated tests.
 
 ## Product Scope
 

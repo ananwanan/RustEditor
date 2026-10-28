@@ -1,0 +1,32 @@
+[workspace]
+resolver = "2"
+members = [
+    "apps/desktop", "crates/editor-core", "crates/plugin-api",
+    "crates/plugin-sdk", "crates/plugin-host", "plugins/text-tools", "xtask",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.88"
+publish = false
+
+[workspace.dependencies]
+rusteditor-editor-core = { path = "crates/editor-core" }
+rusteditor-plugin-api = { path = "crates/plugin-api" }
+rusteditor-plugin-sdk = { path = "crates/plugin-sdk" }
+rusteditor-plugin-host = { path = "crates/plugin-host" }
+eframe = { version = "=0.33.3", default-features = false, features = ["default_fonts", "glow", "x11", "wayland"] }
+libloading = "=0.8.9"
+serde = { version = "=1.0.228", features = ["derive"] }
+serde_json = "=1.0.145"
+toml = "=0.8.23"
+
+[workspace.lints.rust]
+unsafe_op_in_unsafe_fn = "deny"
+
+[workspace.lints.clippy]
+undocumented_unsafe_blocks = "deny"
+
+[profile.release]
+lto = "thin"

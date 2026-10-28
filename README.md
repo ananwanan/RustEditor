@@ -2,13 +2,53 @@
 
 A Rust desktop text and code editor inspired by Notepad++. Features are separated into a Cargo workspace, with extensions provided through dynamically loaded libraries.
 
-Current status: **architecture and development planning; no runnable editor yet**. Empty placeholder crates have not been created, and no implementation milestone is complete.
+Current status: **M0 prototype implemented; Windows manual acceptance is pending**. The native desktop, independent editing core, C ABI/SDK, real dynamic plugin host, text-tools extension, and development tooling are runnable. See the [M0 acceptance record](docs/acceptance/M0.md) for measured results and remaining gates. M0 is not marked complete.
 
 - [Architecture, technology choices, and workspace](docs/ARCHITECTURE.md)
 - [Dynamic library plugin protocol](docs/PLUGIN_ABI.md)
 - [Development roadmap and acceptance criteria](docs/ROADMAP.md)
 
 Initial target: Windows 10/11 x64, followed by Linux and macOS. The application runs as a standalone desktop program without a WebView. It independently implements a similar editing experience and does not promise binary compatibility with Notepad++ plugins.
+
+## Run the M0 preview
+
+Install Rust using [rustup](https://rustup.rs/); `rust-toolchain.toml` selects Rust 1.88.0, rustfmt, and clippy. Use the x64 MSVC toolchain and Visual Studio C++ build tools on Windows.
+
+From the repository root:
+
+```sh
+cargo xtask stage
+cargo run --locked -p rusteditor-desktop
+```
+
+Select text and run **Plugins → Uppercase selection**, **Run command** in the Extensions panel, or **Ctrl+Shift+U**. The example extension is a separately built native library, not linked into the desktop. Its transaction preserves Chinese/emoji and supports Unicode case expansion such as `straße` → `STRASSE`. Ctrl+Z undoes; Ctrl+Y or Ctrl+Shift+Z redoes. Clipboard shortcuts are handled by the native GUI integration.
+
+The editor is currently a **temporary scratch buffer**: no file opening/saving, tabs, encoding conversion, recovery, or large-file mode yet. Modified scratch text requires a discard confirmation before closing. Documents are limited to 4 MiB; undo retains at most 256 transactions and 8 MiB of text deltas. The provisional TextEdit view uses scalar cursor indices; full grapheme navigation and native IME behavior remain validation work.
+
+Chinese glyphs use an installed system font (Microsoft YaHei on Windows, Noto Sans CJK on Linux, PingFang on macOS). Set `RUSTEDITOR_FONT` to a TTF/TTC/OTF path if detection fails. No system font files are redistributed.
+
+```sh
+cargo run --locked -p rusteditor-desktop -- --no-plugins
+cargo run --locked -p rusteditor-desktop -- --plugin-dir /absolute/trusted/plugins
+```
+
+Plugins load at startup from `plugins` next to the executable, or an explicit `--plugin-dir`. Each plugin needs its own subdirectory, platform library, and `plugin.toml`; `cargo xtask stage` creates this layout in the debug output directory. Native plugins have full process privileges: only install code you trust. Close the editor before staging or updating a DLL; changes take effect after restart.
+
+## Validate
+
+```sh
+cargo xtask verify
+```
+
+This runs formatting, clippy, workspace tests, builds/stages text-tools, and checks real-plugin and no-plugin startup without requiring a display. Tests compile separate ABI/lifecycle fault libraries and run deliberate native aborts only in subprocesses. It does **not** perform Windows IME, DPI, clipboard, or visual acceptance. The [manual checklist](docs/acceptance/M0.md#windows-manual-gate) tracks those separately.
+
+```sh
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets --locked -- -D warnings
+cargo test --workspace --locked
+```
+
+CI runs the same `cargo xtask verify` on Ubuntu and Windows for main pushes and pull requests. It does not publish releases.
 
 ## Documentation language
 
