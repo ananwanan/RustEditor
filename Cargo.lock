@@ -1841,14 +1841,25 @@ dependencies = [
 name = "rusteditor-desktop"
 version = "0.1.0"
 dependencies = [
+ "ab_glyph",
  "eframe",
  "rusteditor-editor-core",
+ "rusteditor-editor-view",
  "rusteditor-plugin-host",
 ]
 
 [[package]]
 name = "rusteditor-editor-core"
 version = "0.1.0"
+
+[[package]]
+name = "rusteditor-editor-view"
+version = "0.1.0"
+dependencies = [
+ "egui",
+ "rusteditor-editor-core",
+ "unicode-segmentation",
+]
 
 [[package]]
 name = "rusteditor-plugin-api"

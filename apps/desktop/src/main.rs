@@ -1,6 +1,7 @@
 #![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
 #![deny(unsafe_code)]
 
+mod fonts;
 mod native;
 mod view;
 

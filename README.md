@@ -23,14 +23,16 @@ cargo run --locked -p rusteditor-desktop
 
 Select text and run **Plugins → Uppercase selection**, **Run command** in the Extensions panel, or **Ctrl+Shift+U**. The example extension is a separately built native library, not linked into the desktop. Its transaction preserves Chinese/emoji and supports Unicode case expansion such as `straße` → `STRASSE`. Ctrl+Z undoes; Ctrl+Y or Ctrl+Shift+Z redoes. Clipboard shortcuts are handled by the native GUI integration.
 
-The editor is currently a **temporary scratch buffer**: no file opening/saving, tabs, encoding conversion, recovery, or large-file mode yet. Modified scratch text requires a discard confirmation before closing. Documents are limited to 4 MiB; undo retains at most 256 transactions and 8 MiB of text deltas. The provisional TextEdit view uses scalar cursor indices; full grapheme navigation and native IME behavior remain validation work.
+The editor is currently a **temporary scratch buffer**: no file opening/saving, tabs, encoding conversion, recovery, or large-file mode yet. Modified scratch text requires a discard confirmation before closing. Documents are limited to 4 MiB; undo retains at most 256 transactions and 8 MiB of text deltas. The core-driven editor-view uses extended grapheme boundaries for horizontal movement, selections, hit testing, and deletion. IME preedit remains a presentation overlay until one commit transaction; native Windows IME behavior remains validation work.
 
-Chinese glyphs use an installed system font (Microsoft YaHei on Windows, Noto Sans CJK on Linux, PingFang on macOS). Set `RUSTEDITOR_FONT` to a TTF/TTC/OTF path if detection fails. No system font files are redistributed.
+Chinese glyphs use an installed system font (Microsoft YaHei on Windows, Noto Sans CJK on Linux, PingFang on macOS). Set `RUSTEDITOR_FONT` to an outline TTF/TTC/OTF path if detection fails. Emoji fallback tries Segoe UI Emoji on Windows and Noto Emoji on Linux; `RUSTEDITOR_EMOJI_FONT` selects an explicit font. Fonts are size-bounded, parsed, and checked for representative outline glyphs before registration; invalid or bitmap-only fonts produce diagnostics and fall back safely. No additional font files are bundled. Emoji render as monochrome glyphs; color and ZWJ ligature shaping are not implemented. Full platform/font coverage remains a manual gate.
 
 ```sh
 cargo run --locked -p rusteditor-desktop -- --no-plugins
 cargo run --locked -p rusteditor-desktop -- --plugin-dir /absolute/trusted/plugins
 ```
+
+The experimental plugin SDK targets the current version. Older SDK compatibility is not required; rebuild plugins when the SDK/ABI changes. Version, table-size, capability, and lifecycle checks remain mandatory.
 
 Plugins load at startup from `plugins` next to the executable, or an explicit `--plugin-dir`. Each plugin needs its own subdirectory, platform library, and `plugin.toml`; `cargo xtask stage` creates this layout in the debug output directory. Native plugins have full process privileges: only install code you trust. Close the editor before staging or updating a DLL; changes take effect after restart.
 
@@ -49,6 +51,16 @@ cargo test --workspace --locked
 ```
 
 CI runs the same `cargo xtask verify` on Ubuntu and Windows for main pushes and pull requests. It does not publish releases.
+
+An optional native Linux regression uses a dedicated X11 display with `Xvfb`, `xdotool`, and `xclip` installed:
+
+```sh
+cargo xtask stage
+xvfb-run -a python3 tests/ui/x11_smoke.py
+xvfb-run -a python3 tests/ui/x11_smoke.py --no-plugins
+```
+
+Use `--binary PATH` if Cargo uses a non-default target directory. This exercises native clipboard round trips, plugin shortcuts, grapheme navigation/deletion/cut, and undo/redo. It does not validate Windows IME or DPI. Font overrides above may be passed through the environment; the tests compare text bytes independently of glyph coverage.
 
 ## Documentation language
 

@@ -13,7 +13,7 @@ Before implementation, read:
 
 Explicit user instructions take precedence over this guide. Keep implementation, requirements, and acceptance evidence consistent. Document architectural changes and their rationale rather than silently replacing the planned design.
 
-The repository contains the M0 prototype and its acceptance record in `docs/acceptance/M0.md`. Inspect the current tree and milestone status before starting work; planned paths, example signatures, and proposed commands are not evidence that a later feature exists.
+The repository contains the M0 prototype with a core-driven grapheme view and its acceptance record in `docs/acceptance/M0.md`. Inspect the current tree and milestone status before starting work; planned paths, example signatures, and proposed commands are not evidence that a later feature exists.
 
 ## Language
 
@@ -68,6 +68,7 @@ Enforce the dependency directions in the architecture document:
 Follow `docs/PLUGIN_ABI.md`; it is the detailed protocol specification. The protocol remains a draft until M0 implementation and tests establish it.
 
 - Build native plugins with `crate-type = ["cdylib"]` and load them through libloading. Do not substitute Rust's `dylib` ABI for a stable extension protocol.
+- Target the current experimental SDK/ABI. Older SDK compatibility is not a product requirement; plugins may need rebuilding when the SDK changes. Do not add compatibility shims or frozen historical SDK fixtures. Keep all ABI safety checks.
 - Keep the entry symbol `rusteditor_plugin_entry_v1`, use `extern "C"` functions and `#[repr(C)]` structures, and follow the selected Rust edition's export requirements.
 - Use explicit ABI headers, fixed-width status values, pointer/length buffers, and opaque handles. Do not pass `String`, `Vec`, `Result`, trait objects, Rust references, or GUI objects across the boundary.
 - Validate ABI major/minor versions, structure sizes, buffer capacities, required capabilities, lengths, and UTF-8 boundaries before accessing optional data or applying edits. Minor versions may append fields; incompatible changes require a new major version.
@@ -120,7 +121,7 @@ Validation must cover the behavior affected by the change:
 | File I/O | Encoding round trips, unencodable content, external changes, save failures, and preservation of original files |
 | Search/syntax | Cross-chunk and zero-length matches, replacement transactions, cancellation, and stale-result rejection |
 | Plugins | Build and load a real cdylib from a host that does not link the plugin crate; verify no-plugin startup and ABI/lifecycle failure cases |
-| Compatibility | Test an older-SDK plugin against a newer host; one shared workspace build does not prove ABI compatibility |
+| SDK policy | Target the current SDK/ABI only; older SDK compatibility and frozen cross-version fixtures are not required. Retain ABI version, size, capability, ownership, and failure validation |
 | Windows UI | Record IME composition/candidate placement, 100%/150%/200% DPI, clipboard behavior, shortcuts, tab closing, and recovery as applicable |
 | Performance | Reproducible workload, hardware, build settings, latency/memory measurements, and documented degradation against roadmap budgets |
 

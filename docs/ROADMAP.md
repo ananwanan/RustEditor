@@ -1,6 +1,6 @@
 # Development Roadmap and Acceptance Criteria
 
-M0 implementation is in progress: the workspace, bounded editing core, native desktop prototype, real plugin loading, SDK, text-tools, xtask, and automated failure tests exist. See the [acceptance record](acceptance/M0.md). Windows manual input/DPI acceptance and older-SDK compatibility remain open; M0 is not complete. M1–M6 remain pending. Dependencies are locked for reproducible builds, while the GUI and ABI remain provisional. Estimates below are rough figures for one full-time developer, not delivery commitments.
+M0 implementation is in progress: the workspace, bounded editing core, native desktop prototype, real plugin loading, SDK, text-tools, xtask, and automated failure tests exist. See the [acceptance record](acceptance/M0.md). Windows manual input/DPI/font acceptance remains open; older SDK compatibility is not required; M0 is not complete. M1–M6 remain pending. Dependencies are locked for reproducible builds, while the GUI and ABI remain provisional. Estimates below are rough figures for one full-time developer, not delivery commitments.
 
 | Milestone | Estimate | Deliverables and completion criteria |
 |---|---|---|
@@ -8,7 +8,7 @@ M0 implementation is in progress: the workspace, bounded editing core, native de
 | M1 Basic editing | 2–4 weeks | Document model, core-driven view, tabs, line numbers, selection, undo/redo, open/save, modified state, and close confirmation; test Chinese/emoji/combining characters, empty files, CRLF/LF, read-only files, and save failures; remove duplicate mutable state between temporary string widgets and core |
 | M2 Everyday text features | 2–3 weeks | Literal/regex find and replace, next/previous match, and replace-all as one transaction; UTF-8/BOM, UTF-16, and GBK; unencodable-character prompts; external modification conflicts; configuration, shortcuts, and basic session recovery; byte-range and Unicode boundary regressions |
 | M3 Code editing | 3–5 weeks | Incremental highlighting, indentation, bracket matching, folding, automatic indentation, and split views; initial Rust/C/C++/JSON/TOML support; cancellable background parsing that does not block input or overwrite newer document results |
-| M4 Usable plugin management | 2–3 weeks | Complete manifests, enable/disable UI, logging, and SDK documentation; line-sorting and case-conversion plugins; validate ABI compatibility, invalid plugins, duplicate registrations, and exit cleanup; plugin updates take effect after restart |
+| M4 Usable plugin management | 2–3 weeks | Complete manifests, enable/disable UI, logging, and SDK documentation; line-sorting and case-conversion plugins; validate the current SDK/ABI, invalid plugins, duplicate registrations, and exit cleanup; plugin updates take effect after restart |
 | M5 Performance and reliability | 2–4 weeks | Large-file mode, directory search, long-line degradation, recovery snapshots, corrupted recovery files, full disks, and file-lock tests; publish reproducible benchmarks and known limitations |
 | M6 Initial release | 1–2 weeks | Windows portable package, version information, license inventory, and release checksums; validate complete workflows on a clean physical Windows machine; claim Linux/macOS support only after separate validation |
 
@@ -37,8 +37,8 @@ Each milestone must include implementation, necessary tests, build commands, act
 ## Remaining M0 Tasks
 
 1. Run the Windows manual checklist for Chinese IME composition/candidate positioning, 100%/150%/200% DPI, clipboard, shortcuts, and scratch close confirmation. Fix failures before selecting the final GUI.
-2. Review grapheme movement/deletion in the provisional scalar-index TextEdit view, including combining marks and emoji sequences.
-3. Establish a frozen separately built SDK fixture and test it against a later host revision; current same-workspace fixtures prove loading/failure handling, not released-version compatibility.
+2. Validate the core-driven grapheme view on Windows, including combining marks, emoji/flag/ZWJ sequences, CRLF, word/vertical navigation, and the installed font set. Automated boundary, input-order, clipboard, and synthetic IME regressions are implemented.
+3. Target the current experimental SDK/ABI. Older SDK compatibility and frozen historical SDK fixtures are explicitly out of scope; keep version/size/capability validation and real-library failure tests.
 4. Record GUI/ABI decisions and calibrate startup/input budgets on the specified Windows hardware before marking M0 complete or starting M1. Automated Ubuntu/Windows DLL/core checks already pass; the acceptance record links the actual run.
 
 ## Decisions Still Open

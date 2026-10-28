@@ -1,18 +1,18 @@
 # Architecture Plan
 
-Date: 2026-10-28. The M0 prototype now implements the desktop/core/api/sdk/host/text-tools/xtask path. Later workspace members below remain plans. Rust and dependency versions are locked for reproducible prototype builds; GUI and ABI acceptance remain provisional until the [M0 gates](acceptance/M0.md) pass.
+Date: 2026-10-28. The M0 prototype now implements the desktop/core/view/api/sdk/host/text-tools/xtask path. Later workspace members below remain plans. Rust and dependency versions are locked for reproducible prototype builds; GUI and ABI acceptance remain provisional until the [M0 gates](acceptance/M0.md) pass.
 
 ## M0 Implementation Decisions
 
 - Virtual resolver-2 workspace, Rust 1.88.0, edition 2024, shared metadata/lints, and committed Cargo.lock. No project license has been selected; no distributable release is claimed.
 - eframe/egui 0.33.3 with the native Glow backend; WebView/WASM backends are not used. This is a reproducible MSRV-compatible candidate, not a claim to use the newest release. Windows IME and DPI decide whether to retain it.
 - A bounded UTF-8 String is sufficient for the M0 transaction/ABI experiment. Ropey, virtualized layout, and large-file capability remain unvalidated. Maximum document size is 4 MiB, with 256 undo entries / 8 MiB of retained text deltas.
-- Document is authoritative. The TextBuffer adapter creates a draft only on a mutation during a widget call, validates it, commits one minimal core transaction at the end, then drops it. Failed/oversized paste rolls back the whole draft. TextEdit's independent undo snapshots are cleared each frame; shortcuts use core history. Drafts are synchronous transaction data, not a second persistent document model.
-- Core revisions start at 1 and increase on edits, undo, and redo. Selections use directed UTF-8 byte endpoints; the GUI adapter converts scalar indices. Full grapheme cursor behavior is a remaining view gate, not an achieved capability.
+- Document is authoritative. The independent editor-view renders an egui galley and routes ordered keyboard, pointer, clipboard, and IME events into core transactions. It retains no editable String or duplicate undo stack. A bounded transient IME overlay retains the source DocumentId/Revision/range without mutating the document; commit is one validated transaction, cancellation preserves the original selection, and stale/late commits are ignored. Failed/oversized paste preserves the original text, selection and history.
+- Core revisions start at 1 and increase on edits, undo, and redo. ABI selections use directed UTF-8 byte endpoints. The view converts egui scalar positions and snaps user selections/carets to Unicode extended grapheme boundaries using unicode-segmentation 1.13.3 (Unicode UAX #29). Plain left/right, Shift selection and Backspace/Delete treat combining sequences, ZWJ emoji, flags, keycaps and CRLF as units. Word/vertical and pointer targets are normalized to cluster boundaries. This is navigation behavior, not a claim of complex-script/emoji ligature shaping.
 - libloading 0.8.9 loads real cdylibs at startup. Host/SDK meet through the implemented v1.0 C tables in plugin-api; the desktop does not link the plugin crate. Explicit plugin installations and manifests gate loading; Windows uses DLL-directory + System32 search flags, Unix uses RTLD_NOW | RTLD_LOCAL.
-- The M0 command registry lives in plugin-host. A standalone commands crate and editor-view crate will be extracted when M1 needs shared routing/view responsibilities; no empty placeholders were created.
+- The M0 command registry lives in plugin-host. The editor-view crate was extracted to close the scalar-navigation gap before M1; the commands crate remains planned. No empty placeholders were created. Font installation remains desktop assembly code: bounded outline parsing through ab_glyph 0.2.32, CJK and emoji fallbacks, explicit overrides, and diagnostics; additional fonts are not redistributed.
 - Rust FFI boundaries convert unwindable panics to fixed status values. Unknown native state or failed shutdown retains the library, host table, and context until process exit. Disabling only removes dispatch; updates require restart.
-- Windows native GUI verification, older released-SDK compatibility, performance budgets, safe file saving, and platform release support are not established by the current automated tests. Ubuntu/Windows DLL/core CI and a Linux X11 window smoke pass; see the acceptance record for their exact scope and font limitations.
+- The experimental SDK/ABI targets the current version; older SDK compatibility and historical fixtures are not required. ABI safety checks remain in force. Windows native GUI verification, performance budgets, safe file saving, and platform release support are not established by the current automated tests. Ubuntu/Windows DLL/core CI and a Linux X11 window smoke pass; see the acceptance record for their exact scope and font limitations.
 
 ## Product Scope
 
@@ -50,7 +50,7 @@ Do not turn every crate into a dynamic library. Frequent internal operations inv
 |---|---|---|
 | GUI | egui + eframe | Efficient Rust desktop prototyping; M0 must validate Windows Chinese IME, scaling, clipboard behavior, and shortcuts |
 | Text model | ropey | Candidate chunked text model; benchmark large-file editing, indexing, and snapshot costs |
-| Editor view | Prototype interaction with TextEdit, then implement a core-driven virtualized view | A conventional string widget does not establish large-file capability; do not retain two independently editable models |
+| Editor view | Core-driven grapheme view implemented; virtualization remains planned | Ordered input and a transient IME overlay operate on the core; the bounded full-document galley does not establish large-file capability |
 | Highlighting | tree-sitter, introduced incrementally by language | Separate parsing tasks; tag results with document revisions and discard stale results |
 | Search | regex + a custom cross-chunk scanning layer | Rope chunk boundaries can split matches; flattening a whole document is restricted to bounded small-file paths |
 | Encoding | encoding_rs + dedicated BOM/UTF-16 handling | Validate legacy encodings such as GBK separately from UTF-16; users must choose how to handle unencodable characters |
@@ -84,7 +84,8 @@ The initial distribution is a Windows portable package with separate program and
 - [Cargo workspaces](https://doc.rust-lang.org/cargo/reference/workspaces.html)
 - [Rust linkage](https://doc.rust-lang.org/reference/linkage.html)
 - [Rust FFI](https://doc.rust-lang.org/nomicon/ffi.html)
-- [egui TextEdit](https://docs.rs/egui/latest/egui/widgets/text_edit/struct.TextEdit.html)
+- [egui Galley](https://docs.rs/egui/0.33.3/egui/struct.Galley.html)
+- [Unicode grapheme segmentation](https://docs.rs/unicode-segmentation/1.13.3/unicode_segmentation/struct.GraphemeCursor.html)
 - [libloading](https://docs.rs/libloading/latest/libloading/struct.Library.html)
 
 These references document tool capabilities and boundary requirements. The technology choices, directory structure, and milestones above are project design proposals.
