@@ -40,7 +40,10 @@ impl EditorView {
                         if document.text().len() - c.range.len() + text.len() > MAX_DOCUMENT_BYTES {
                             return Err(EditError::TooLarge);
                         }
-                        c.text.clone_from(text);
+                        if c.text != *text {
+                            self.layout_cache.clear();
+                            c.text.clone_from(text);
+                        }
                     }
                 }
                 ImeEvent::Commit(text) => {
@@ -49,6 +52,9 @@ impl EditorView {
                         return Ok(false);
                     }
                     let composition = self.composition.take();
+                    if composition.is_some() {
+                        self.layout_cache.clear();
+                    }
                     if !text.is_empty() && text != "\r" && text != "\n" {
                         let range = if let Some(c) = composition {
                             if c.document_id != document.id() || c.revision != document.revision() {

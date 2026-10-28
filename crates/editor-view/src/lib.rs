@@ -4,6 +4,7 @@
 
 mod grapheme;
 mod input;
+mod layout_cache;
 
 use egui::{
     Color32, EventFilter, FontId, Galley, Id, Response, Sense, Ui,
@@ -30,6 +31,7 @@ pub struct EditorView {
     h_pos: Option<f32>,
     focus_requested: bool,
     last_interaction: f64,
+    layout_cache: layout_cache::LayoutCache,
 }
 
 impl Default for EditorView {
@@ -41,6 +43,7 @@ impl Default for EditorView {
             h_pos: None,
             focus_requested: true,
             last_interaction: 0.0,
+            layout_cache: Default::default(),
         }
     }
 }
@@ -57,6 +60,9 @@ impl EditorView {
         // ordinary focus changes must not disable that native input path.
         self.ignore_ime_commit |= self.ime_session_active || self.composition.is_some();
         self.ime_session_active = false;
+        if self.composition.is_some() {
+            self.layout_cache.clear();
+        }
         self.composition = None;
     }
 
@@ -95,9 +101,15 @@ impl EditorView {
             self.cancel_composition();
         }
         normalize(document);
-        let font = FontId::monospace(16.0);
+        let font = ui
+            .style()
+            .override_font_id
+            .clone()
+            .unwrap_or_else(|| FontId::monospace(16.0));
         let color = ui.visuals().text_color();
-        let mut galley = self.layout(ui.ctx(), document, &font, color);
+        // Keep egui's current document and paragraph entries used each frame.
+        // Bypassing this across frames evicts them and regresses later edits.
+        let mut galley = self.layout(ui.ctx(), document, &font, color, true);
         let size = (galley.size() + egui::vec2(12.0, 12.0)).max(ui.available_size());
         let (_, rect) = ui.allocate_space(size);
         // Assign a stable focus ID separately from the allocation's automatic ID.
@@ -117,7 +129,7 @@ impl EditorView {
                 && ui.input(|i| i.pointer.any_pressed())
             {
                 self.cancel_composition();
-                galley = self.layout(ui.ctx(), document, &font, color);
+                galley = self.layout(ui.ctx(), document, &font, color, false);
             }
             if !self.is_composing() {
                 let scalar = galley.cursor_from_pos(pointer - pos);
@@ -206,11 +218,11 @@ impl EditorView {
                 }
                 // The next event in the same frame sees the current text and
                 // cursor, including after a paste, deletion, undo or IME commit.
-                galley = self.layout(ui.ctx(), document, &font, color);
+                galley = self.layout(ui.ctx(), document, &font, color, false);
             }
         } else {
             self.cancel_composition();
-            galley = self.layout(ui.ctx(), document, &font, color);
+            galley = self.layout(ui.ctx(), document, &font, color, false);
         }
 
         let displayed_selection = self.display_selection(document);
@@ -219,7 +231,9 @@ impl EditorView {
         let caret = cursor_rect(&galley, &range.primary, row_height).translate(pos.to_vec2());
         let painter = ui.painter_at(rect.intersect(ui.clip_rect()));
         painter.rect_filled(rect, 0.0, ui.visuals().extreme_bg_color);
-        visuals::paint_text_selection(&mut galley, ui.visuals(), &range, None);
+        let galley = self
+            .layout_cache
+            .paint_selection(galley, ui.visuals(), &range);
         painter.galley(pos, galley, color);
         if focused {
             if interacted {
@@ -255,12 +269,19 @@ impl EditorView {
     }
 
     fn layout(
-        &self,
+        &mut self,
         ctx: &egui::Context,
         document: &Document,
         font: &FontId,
         color: Color32,
+        refresh_fonts_cache: bool,
     ) -> Arc<Galley> {
+        let font_epoch = ctx.fonts_mut(|f| f.layout_no_wrap(String::new(), font.clone(), color));
+        if let Some(galley) = self.layout_cache.get(document, font_epoch)
+            && !refresh_fonts_cache
+        {
+            return galley;
+        }
         let text = if let Some(c) = &self.composition
             && !c.text.is_empty()
         {
@@ -273,7 +294,9 @@ impl EditorView {
         } else {
             document.text().to_owned()
         };
-        ctx.fonts_mut(|f| f.layout_no_wrap(text, font.clone(), color))
+        let galley = ctx.fonts_mut(|f| f.layout_no_wrap(text, font.clone(), color));
+        self.layout_cache.insert(document, galley.clone());
+        galley
     }
 
     fn display_selection(&self, document: &Document) -> Selection {

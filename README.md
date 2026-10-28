@@ -35,6 +35,8 @@ cargo run --locked -p rusteditor-desktop -- --plugin-dir /absolute/trusted/plugi
 
 Use `--empty` to start an empty scratch buffer for GUI measurements. It cannot be combined with the headless `--smoke-test`, which uses a fixed test fixture. The [Windows performance protocol](tests/perf/README.md) provides a real-process memory harness and deterministic UTF-8 workloads. Window discovery timing is diagnostic; editable startup and input-to-present latency require separate presentation evidence.
 
+The protocol also provides headless render CPU/allocation diagnostics using the same Unicode fixtures. The view retains a bounded derived layout/selection cache (256 MiB accounted payload); this does not change document authority or establish large-file support. Internal timers and allocation counters do not satisfy the remaining displayed-frame performance gates.
+
 The experimental plugin SDK targets the current version. Older SDK compatibility is not required; rebuild plugins when the SDK/ABI changes. Version, table-size, capability, and lifecycle checks remain mandatory.
 
 Plugins load at startup from `plugins` next to the executable, or an explicit `--plugin-dir`. Each plugin needs its own subdirectory, platform library, and `plugin.toml`; `cargo xtask stage` creates this layout in the debug output directory. Native plugins have full process privileges: only install code you trust. Close the editor before staging or updating a DLL; changes take effect after restart.

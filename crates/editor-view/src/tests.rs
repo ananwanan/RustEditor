@@ -11,6 +11,7 @@ struct Harness {
     error: Option<String>,
     scroll_offset: Option<egui::Vec2>,
     focused: bool,
+    max_texture_side: Option<usize>,
 }
 
 impl Harness {
@@ -23,6 +24,7 @@ impl Harness {
             error: None,
             scroll_offset: None,
             focused: true,
+            max_texture_side: None,
         };
         harness.frame(Vec::new());
         harness
@@ -40,6 +42,7 @@ impl Harness {
                 focused: self.focused,
                 time: Some(self.time),
                 events,
+                max_texture_side: self.max_texture_side,
                 ..Default::default()
             },
             |ctx| {
@@ -671,4 +674,311 @@ fn randomized_input_batches_match_an_independent_grapheme_reference() {
             }
         );
     }
+}
+
+fn text_shape(output: &egui::FullOutput) -> &egui::epaint::TextShape {
+    output
+        .shapes
+        .iter()
+        .find_map(|shape| match &shape.shape {
+            egui::Shape::Text(text) => Some(text),
+            _ => None,
+        })
+        .expect("the nonempty editor paints a text shape")
+}
+
+fn assert_candidate_matches_display(
+    ctx: &egui::Context,
+    output: &egui::FullOutput,
+    selection: Selection,
+) {
+    let text = text_shape(output);
+    let range = cursors(text.galley.text(), selection, None);
+    let font = &text.galley.job.sections[0].format.font_id;
+    let row_height = ctx.fonts_mut(|fonts| fonts.row_height(font));
+    let expected =
+        cursor_rect(&text.galley, &range.primary, row_height).translate(text.pos.to_vec2());
+    let ime = output.platform_output.ime.expect("focused candidate area");
+    assert_eq!(ime.rect, ime.cursor_rect);
+    assert_eq!(ime.cursor_rect, expected);
+}
+
+#[test]
+fn rendered_text_and_navigation_follow_each_edit_in_a_batch() {
+    let mut h = Harness::new("start");
+    h.caret(5);
+    let output = h.frame(vec![
+        Event::Paste("\n中e\u{301}TAIL".into()),
+        key(Key::Home),
+        key(Key::ArrowRight),
+        key(Key::Delete),
+        key(Key::End),
+        Event::Text("!".into()),
+    ]);
+    assert_eq!(h.document.text(), "start\n中TAIL!");
+    assert_eq!(text_shape(&output).galley.text(), h.document.text());
+    assert_eq!(h.document.selection().head, h.document.text().len());
+    assert_candidate_matches_display(&h.ctx, &output, h.document.selection());
+
+    let output = h.frame(vec![
+        key_with(Key::Z, Modifiers::COMMAND),
+        key(Key::Home),
+        Event::Text("前".into()),
+        key(Key::ArrowDown),
+        key_with(Key::Y, Modifiers::COMMAND),
+    ]);
+    assert_eq!(h.document.text(), "start\n前中TAIL");
+    assert_eq!(text_shape(&output).galley.text(), h.document.text());
+    assert_candidate_matches_display(&h.ctx, &output, h.document.selection());
+}
+
+#[test]
+fn alternating_edits_keep_egui_document_and_paragraph_cache_entries_warm() {
+    let text = "hello 中e\u{301}\nsecond line\n尾";
+    let mut h = Harness::new(text);
+    h.caret(text.len());
+    let initial = h.frame(vec![]);
+    let original = text_shape(&initial).galley.clone();
+    let mut edited = None;
+    for cycle in 0..3 {
+        let inserted = h.frame(vec![Event::Text("x".into())]);
+        let inserted_galley = text_shape(&inserted).galley.clone();
+        assert_eq!(inserted_galley.text(), format!("{text}x"));
+        if let Some(previous) = &edited {
+            assert!(Arc::ptr_eq(previous, &inserted_galley), "cycle {cycle}");
+        }
+        edited = Some(inserted_galley);
+
+        let deleted = h.frame(vec![key(Key::Backspace)]);
+        assert_eq!(h.document.text(), text);
+        assert_eq!(text_shape(&deleted).galley.text(), text);
+        assert!(Arc::ptr_eq(&original, &text_shape(&deleted).galley));
+        assert_candidate_matches_display(&h.ctx, &deleted, h.document.selection());
+    }
+}
+
+#[test]
+fn selection_paint_does_not_contaminate_later_cursor_or_document_frames() {
+    let mut h = Harness::new("Ae\u{301}中Z");
+    let mut visuals = h.ctx.style().visuals.clone();
+    let highlight = Color32::from_rgb(23, 45, 67);
+    visuals.selection.bg_fill = highlight;
+    h.ctx.set_visuals(visuals);
+    let baseline = h.frame(vec![]);
+    let original = text_shape(&baseline).galley.clone();
+    let original_rows = original.rows.clone();
+    h.document
+        .set_selection(Selection { anchor: 1, head: 7 })
+        .unwrap();
+    let selected = h.frame(vec![]);
+    let stable_selected = h.frame(vec![]);
+    assert!(Arc::ptr_eq(
+        &text_shape(&selected).galley,
+        &text_shape(&stable_selected).galley,
+    ));
+    let context = h.ctx.clone();
+    let contains_highlight = |output: &egui::FullOutput| {
+        context
+            .tessellate(output.shapes.clone(), output.pixels_per_point)
+            .iter()
+            .any(|primitive| match &primitive.primitive {
+                egui::epaint::Primitive::Mesh(mesh) => {
+                    mesh.vertices.iter().any(|vertex| vertex.color == highlight)
+                }
+                egui::epaint::Primitive::Callback(_) => false,
+            })
+    };
+    assert!(contains_highlight(&selected));
+    assert_eq!(original.rows, original_rows);
+    assert_eq!(text_shape(&selected).galley.text(), h.document.text());
+    assert_candidate_matches_display(&h.ctx, &selected, h.document.selection());
+
+    h.caret(1);
+    let unselected = h.frame(vec![]);
+    assert!(!contains_highlight(&unselected));
+    assert_eq!(text_shape(&unselected).galley.rows, original_rows);
+    assert_candidate_matches_display(&h.ctx, &unselected, h.document.selection());
+
+    h.document = Document::new(DocumentId(2), "different").unwrap();
+    let replaced = h.frame(vec![]);
+    assert_eq!(h.document.revision(), Revision(1));
+    assert_eq!(text_shape(&replaced).galley.text(), "different");
+    assert!(!contains_highlight(&replaced));
+    h.document.replace(0..9, "revised").unwrap();
+    let revised = h.frame(vec![]);
+    assert_eq!(text_shape(&revised).galley.text(), "revised");
+}
+
+#[test]
+fn rendered_ime_overlay_observes_repeated_preedit_clear_commit_and_cancel() {
+    for native_clear in [
+        ime(ImeEvent::Disabled),
+        ime(ImeEvent::Preedit(String::new())),
+    ] {
+        let mut h = Harness::new("L原R");
+        let selection = Selection { anchor: 4, head: 1 };
+        h.document.set_selection(selection).unwrap();
+        for preedit in ["ni", "ni", "nih"] {
+            let output = h.frame(vec![ime(ImeEvent::Preedit(preedit.into()))]);
+            assert_eq!(text_shape(&output).galley.text(), format!("L{preedit}R"));
+            assert_eq!(h.document.text(), "L原R");
+            assert_eq!(h.document.revision(), Revision(1));
+            assert_candidate_matches_display(
+                &h.ctx,
+                &output,
+                Selection {
+                    anchor: 1,
+                    head: 1 + preedit.len(),
+                },
+            );
+        }
+        let output = h.frame(vec![
+            native_clear,
+            ime(ImeEvent::Commit("你".into())),
+            ime(ImeEvent::Disabled),
+        ]);
+        assert_eq!(text_shape(&output).galley.text(), "L你R");
+        assert_eq!(h.document.revision(), Revision(2));
+        assert_candidate_matches_display(&h.ctx, &output, h.document.selection());
+        let output = h.frame(vec![key_with(Key::Z, Modifiers::COMMAND)]);
+        assert_eq!(text_shape(&output).galley.text(), "L原R");
+        assert_eq!(h.document.selection(), selection);
+        assert!(!h.document.can_undo());
+        h.frame(vec![ime(ImeEvent::Preedit("hao".into()))]);
+        let output = h.frame(vec![key(Key::Escape)]);
+        assert_eq!(text_shape(&output).galley.text(), "L原R");
+        let output = h.frame(vec![
+            ime(ImeEvent::Disabled),
+            ime(ImeEvent::Commit("好".into())),
+            ime(ImeEvent::Disabled),
+        ]);
+        assert_eq!(text_shape(&output).galley.text(), "L原R");
+        assert_eq!(h.document.selection(), selection);
+        assert_eq!(h.document.revision(), Revision(3));
+    }
+}
+
+#[test]
+fn display_and_candidate_geometry_refresh_after_font_scale_theme_and_atlas_changes() {
+    let mut h = Harness::new("MMMMiiiW");
+    h.caret(h.document.text().len());
+    let initial = h.frame(vec![]);
+    let initial_width = text_shape(&initial).galley.size().x;
+
+    let mut style = (*h.ctx.style()).clone();
+    style.override_font_id = Some(FontId::monospace(26.0));
+    h.ctx.set_style(style);
+    let larger = h.frame(vec![]);
+    assert_eq!(
+        text_shape(&larger).galley.job.sections[0]
+            .format
+            .font_id
+            .size,
+        26.0
+    );
+    assert!(text_shape(&larger).galley.size().x > initial_width);
+    assert_candidate_matches_display(&h.ctx, &larger, h.document.selection());
+
+    let mut definitions = egui::FontDefinitions::default();
+    definitions.families.insert(
+        egui::FontFamily::Monospace,
+        definitions.families[&egui::FontFamily::Proportional].clone(),
+    );
+    h.ctx.set_fonts(definitions);
+    let redefined = h.frame(vec![]);
+    assert_ne!(
+        text_shape(&redefined).galley.rows,
+        text_shape(&larger).galley.rows
+    );
+    assert_candidate_matches_display(&h.ctx, &redefined, h.document.selection());
+
+    for scale in [1.0, 1.5, 2.0] {
+        h.ctx.set_pixels_per_point(scale);
+        let output = h.frame(vec![]);
+        assert_eq!(output.pixels_per_point, scale);
+        assert_eq!(text_shape(&output).galley.pixels_per_point, scale);
+        assert_candidate_matches_display(&h.ctx, &output, h.document.selection());
+    }
+
+    let color = Color32::from_rgb(11, 133, 211);
+    let mut visuals = egui::Visuals::light();
+    visuals.override_text_color = Some(color);
+    h.ctx.set_visuals(visuals);
+    let themed = h.frame(vec![]);
+    assert_eq!(
+        text_shape(&themed).galley.job.sections[0].format.color,
+        color
+    );
+    assert_candidate_matches_display(&h.ctx, &themed, h.document.selection());
+
+    // Changing the atlas limit rebuilds Fonts without changing its definitions.
+    let before_reset = text_shape(&themed).galley.clone();
+    h.max_texture_side = Some(4096);
+    let atlas_reset = h.frame(vec![]);
+    assert!(!Arc::ptr_eq(
+        &before_reset,
+        &text_shape(&atlas_reset).galley
+    ));
+    assert_candidate_matches_display(&h.ctx, &atlas_reset, h.document.selection());
+
+    let before_alpha = text_shape(&atlas_reset).galley.clone();
+    h.ctx.style_mut(|style| {
+        style.visuals.text_alpha_from_coverage = egui::epaint::AlphaFromCoverage::Gamma(0.7);
+    });
+    let alpha_reset = h.frame(vec![]);
+    assert!(!Arc::ptr_eq(
+        &before_alpha,
+        &text_shape(&alpha_reset).galley
+    ));
+    assert_candidate_matches_display(&h.ctx, &alpha_reset, h.document.selection());
+
+    h.ctx = egui::Context::default();
+    h.view.request_focus();
+    let other_context = h.frame(vec![]);
+    assert_eq!(text_shape(&other_context).galley.pixels_per_point, 1.0);
+    assert_eq!(
+        text_shape(&other_context).galley.job.sections[0]
+            .format
+            .font_id
+            .size,
+        16.0
+    );
+    assert_candidate_matches_display(&h.ctx, &other_context, h.document.selection());
+}
+
+#[test]
+fn selected_text_refreshes_when_only_selection_theme_changes() {
+    let mut h = Harness::new("selected");
+    h.document
+        .set_selection(Selection { anchor: 0, head: 8 })
+        .unwrap();
+    let before = h.frame(vec![]);
+    let old_color = text_shape(&before).galley.job.sections[0].format.color;
+    let background = Color32::from_rgb(31, 47, 61);
+    let foreground = Color32::from_rgb(71, 89, 103);
+    h.ctx.style_mut(|style| {
+        style.visuals.selection.bg_fill = background;
+        style.visuals.selection.stroke.color = foreground;
+    });
+    let after = h.frame(vec![]);
+    assert_eq!(
+        text_shape(&after).galley.job.sections[0].format.color,
+        old_color
+    );
+    let primitives = h
+        .ctx
+        .tessellate(after.shapes.clone(), after.pixels_per_point);
+    for color in [background, foreground] {
+        assert!(
+            primitives
+                .iter()
+                .any(|primitive| match &primitive.primitive {
+                    egui::epaint::Primitive::Mesh(mesh) => {
+                        mesh.vertices.iter().any(|vertex| vertex.color == color)
+                    }
+                    egui::epaint::Primitive::Callback(_) => false,
+                })
+        );
+    }
+    assert_candidate_matches_display(&h.ctx, &after, h.document.selection());
 }
