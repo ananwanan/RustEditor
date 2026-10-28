@@ -59,7 +59,8 @@ impl EditorView {
                     }
                 }
                 ImeEvent::Disabled => {
-                    self.ignore_ime_commit |= self.composition.take().is_some();
+                    self.composition = None;
+                    self.ignore_ime_commit = true;
                 }
             }
             self.h_pos = None;
@@ -74,7 +75,8 @@ impl EditorView {
                     ..
                 }
         ) {
-            self.ignore_ime_commit |= self.composition.take().is_some();
+            self.composition = None;
+            self.ignore_ime_commit = true;
             return Ok(true);
         }
         if self.is_composing() {

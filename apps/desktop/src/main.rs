@@ -16,6 +16,7 @@ struct Options {
     plugin_dir: Option<PathBuf>,
     no_plugins: bool,
     smoke: bool,
+    empty: bool,
 }
 
 fn options() -> Result<Option<Options>, String> {
@@ -33,9 +34,10 @@ fn options() -> Result<Option<Options>, String> {
             }
             Some("--no-plugins") => result.no_plugins = true,
             Some("--smoke-test") => result.smoke = true,
+            Some("--empty") => result.empty = true,
             Some("--help" | "-h") => {
                 println!(
-                    "RustEditor M0\n\n  --plugin-dir PATH  Enable trusted native plugins in PATH at startup\n  --no-plugins       Start without loading any plugins\n  --smoke-test       Verify the core/host path without opening a window\n\nDefault: plugins next to the executable. Native code has host-process privileges.\nScratch text is temporary; file opening and saving arrive in M1."
+                    "RustEditor M0\n\n  --plugin-dir PATH  Enable trusted native plugins in PATH at startup\n  --no-plugins       Start without loading any plugins\n  --smoke-test       Verify the core/host path without opening a window\n  --empty            Open an empty scratch buffer (for GUI validation)\n\nDefault: plugins next to the executable. Native code has host-process privileges.\nScratch text is temporary; file opening and saving arrive in M1."
                 );
                 return Ok(None);
             }
@@ -44,6 +46,9 @@ fn options() -> Result<Option<Options>, String> {
     }
     if result.no_plugins && result.plugin_dir.is_some() {
         return Err("choose either --no-plugins or --plugin-dir".into());
+    }
+    if result.empty && result.smoke {
+        return Err("--empty requires a GUI run; --smoke-test uses its fixed fixture".into());
     }
     Ok(Some(result))
 }
@@ -61,6 +66,8 @@ fn run() -> Result<(), String> {
     };
     let text = if options.smoke {
         "before | 你好 straße🙂 e\u{301} | after"
+    } else if options.empty {
+        ""
     } else {
         "Hello, RustEditor! 你好，世界！ straße 👩‍💻 e\u{301}\n\nSelect text, then use Plugins → Uppercase selection (Ctrl+Shift+U).\n\nThis M0 scratch buffer is temporary. File opening and saving arrive in M1.\n"
     };
@@ -73,7 +80,7 @@ fn run() -> Result<(), String> {
     let end = if options.smoke {
         text.find(" | after").expect("sample")
     } else {
-        text.find('!').expect("sample") + 1
+        text.find('!').map_or(0, |index| index + 1)
     };
     document
         .set_selection(Selection {

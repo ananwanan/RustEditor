@@ -29,8 +29,11 @@ Chinese glyphs use an installed system font (Microsoft YaHei on Windows, Noto Sa
 
 ```sh
 cargo run --locked -p rusteditor-desktop -- --no-plugins
+cargo run --locked -p rusteditor-desktop -- --no-plugins --empty
 cargo run --locked -p rusteditor-desktop -- --plugin-dir /absolute/trusted/plugins
 ```
+
+Use `--empty` to start an empty scratch buffer for GUI measurements. It cannot be combined with the headless `--smoke-test`, which uses a fixed test fixture. The [Windows performance protocol](tests/perf/README.md) provides a real-process memory harness and deterministic UTF-8 workloads. Window discovery timing is diagnostic; editable startup and input-to-present latency require separate presentation evidence.
 
 The experimental plugin SDK targets the current version. Older SDK compatibility is not required; rebuild plugins when the SDK/ABI changes. Version, table-size, capability, and lifecycle checks remain mandatory.
 

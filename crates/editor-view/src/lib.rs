@@ -182,7 +182,11 @@ impl EditorView {
                 galley = self.layout(ui.ctx(), document, &font, color);
             }
         } else {
-            self.ignore_ime_commit |= self.composition.take().is_some();
+            self.composition = None;
+            // Focus may leave after Enabled but before the first nonempty
+            // Preedit. A delayed Commit must not edit a subsequently focused
+            // selection; Enabled or a new nonempty Preedit starts a new session.
+            self.ignore_ime_commit = true;
             galley = self.layout(ui.ctx(), document, &font, color);
         }
 
@@ -211,7 +215,11 @@ impl EditorView {
                 .unwrap_or_default();
             ui.output_mut(|o| {
                 o.ime = Some(egui::output::IMEOutput {
-                    rect: transform * rect,
+                    // egui-winit 0.33 uses rect for set_ime_cursor_area. On
+                    // Windows this excludes the supplied area from candidates,
+                    // so the full document rect would anchor them far below the
+                    // caret. Supply the caret line as the native exclusion area.
+                    rect: transform * caret,
                     cursor_rect: transform * caret,
                 });
                 o.mutable_text_under_cursor = response.hovered();
