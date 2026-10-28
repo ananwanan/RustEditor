@@ -1,6 +1,6 @@
 # Development Roadmap and Acceptance Criteria
 
-All milestones are currently pending. Complete M0 validation before freezing the GUI, dependency versions, and ABI. A plan does not imply implemented functionality. Estimates below are rough figures for one full-time developer, not delivery commitments.
+M0 implementation is in progress: the workspace, bounded editing core, native desktop prototype, real plugin loading, SDK, text-tools, xtask, and automated failure tests exist. See the [acceptance record](acceptance/M0.md). Windows manual input/DPI acceptance and older-SDK compatibility remain open; M0 is not complete. M1–M6 remain pending. Dependencies are locked for reproducible builds, while the GUI and ABI remain provisional. Estimates below are rough figures for one full-time developer, not delivery commitments.
 
 | Milestone | Estimate | Deliverables and completion criteria |
 |---|---|---|
@@ -34,14 +34,12 @@ Core: edit/undo/redo invariants, randomized edits compared with a simple referen
 
 Each milestone must include implementation, necessary tests, build commands, actual acceptance evidence, and an updated milestone status. Empty crates or screenshots alone do not establish completion.
 
-## Concrete Tasks for the Next Development Session
+## Remaining M0 Tasks
 
-1. Create the resolver=2 workspace and minimal M0 members, share version/edition/MSRV/lint settings, and generate Cargo.lock.
-2. Implement independent core document/selection transactions and revision-conflict checks.
-3. Define complete ABI v1 structures, size/version validation, SDK wrappers, and the entry point.
-4. Build text-tools as a cdylib and load it with libloading; use xtask to stage the library and manifest in the development plugin directory.
-5. Validate desktop IME, DPI, and command invocation; implement failure-path integration tests.
-6. Create baseline main/PR CI, record Windows manual acceptance results, and decide whether to retain the GUI choice before M1.
+1. Run the Windows manual checklist for Chinese IME composition/candidate positioning, 100%/150%/200% DPI, clipboard, shortcuts, and scratch close confirmation. Fix failures before selecting the final GUI.
+2. Review grapheme movement/deletion in the provisional scalar-index TextEdit view, including combining marks and emoji sequences.
+3. Establish a frozen separately built SDK fixture and test it against a later host revision; current same-workspace fixtures prove loading/failure handling, not released-version compatibility.
+4. Record GUI/ABI decisions and calibrate startup/input budgets on the specified Windows hardware before marking M0 complete or starting M1. Automated Ubuntu/Windows DLL/core checks already pass; the acceptance record links the actual run.
 
 ## Decisions Still Open
 

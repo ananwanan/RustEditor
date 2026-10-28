@@ -13,7 +13,7 @@ Before implementation, read:
 
 Explicit user instructions take precedence over this guide. Keep implementation, requirements, and acceptance evidence consistent. Document architectural changes and their rationale rather than silently replacing the planned design.
 
-The repository initially contains planning documents only. Inspect the current tree and milestone status before starting work; planned paths, example signatures, and proposed commands are not evidence that code exists.
+The repository contains the M0 prototype and its acceptance record in `docs/acceptance/M0.md`. Inspect the current tree and milestone status before starting work; planned paths, example signatures, and proposed commands are not evidence that a later feature exists.
 
 ## Language
 
