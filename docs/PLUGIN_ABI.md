@@ -10,7 +10,7 @@ Native plugins run inside the host process with native privileges. They cannot i
 
 ## Entry Point and Negotiation
 
-The sole exported symbol is `rnp_plugin_entry_v1`, with a fixed signature:
+The sole exported symbol is `rusteditor_plugin_entry_v1`, with a fixed signature:
 
 ```rust
 // Illustrative signature; complete structures will be defined in plugin-api in M0.

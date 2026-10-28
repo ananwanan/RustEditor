@@ -2,7 +2,7 @@
 
 ## Scope and Required Reading
 
-These instructions apply to the entire RustNotePlusPlus repository. Read any more specific `AGENTS.md` files before changing their directories.
+These instructions apply to the entire RustEditor repository. Read any more specific `AGENTS.md` files before changing their directories.
 
 Before implementation, read:
 
@@ -40,18 +40,18 @@ Create members progressively using the planned paths and package names:
 
 | Path | Package | Boundary |
 |---|---|---|
-| `apps/desktop` | `rnp-desktop` | Executable, application assembly, windows, menus, tabs, and shortcuts |
-| `crates/editor-core` | `rnp-editor-core` | GUI-independent documents, transactions, selections, revisions, and undo/redo |
-| `crates/editor-view` | `rnp-editor-view` | Layout, rendering, hit testing, scrolling, and IME integration |
-| `crates/file-io` | `rnp-file-io` | Encodings, line endings, safe saving, monitoring, and recovery |
-| `crates/commands` | `rnp-commands` | Command IDs, routing, shortcuts, and enablement |
-| `crates/search` | `rnp-search` | Literal/regex searches and replacement transactions |
-| `crates/syntax` | `rnp-syntax` | Parsing, highlighting, and folding information |
-| `crates/settings` | `rnp-settings` | Configuration, themes, sessions, and migrations |
-| `crates/plugin-api` | `rnp-plugin-api` | Minimal C ABI types and constants |
-| `crates/plugin-sdk` | `rnp-plugin-sdk` | Rust plugin wrappers, validation, and panic conversion |
-| `crates/plugin-host` | `rnp-plugin-host` | Discovery, loading, negotiation, registration, and lifecycle |
-| `plugins/text-tools` | `rnp-text-tools` | Example text-command extension built as a `cdylib` |
+| `apps/desktop` | `rusteditor-desktop` | Executable, application assembly, windows, menus, tabs, and shortcuts |
+| `crates/editor-core` | `rusteditor-editor-core` | GUI-independent documents, transactions, selections, revisions, and undo/redo |
+| `crates/editor-view` | `rusteditor-editor-view` | Layout, rendering, hit testing, scrolling, and IME integration |
+| `crates/file-io` | `rusteditor-file-io` | Encodings, line endings, safe saving, monitoring, and recovery |
+| `crates/commands` | `rusteditor-commands` | Command IDs, routing, shortcuts, and enablement |
+| `crates/search` | `rusteditor-search` | Literal/regex searches and replacement transactions |
+| `crates/syntax` | `rusteditor-syntax` | Parsing, highlighting, and folding information |
+| `crates/settings` | `rusteditor-settings` | Configuration, themes, sessions, and migrations |
+| `crates/plugin-api` | `rusteditor-plugin-api` | Minimal C ABI types and constants |
+| `crates/plugin-sdk` | `rusteditor-plugin-sdk` | Rust plugin wrappers, validation, and panic conversion |
+| `crates/plugin-host` | `rusteditor-plugin-host` | Discovery, loading, negotiation, registration, and lifecycle |
+| `plugins/text-tools` | `rusteditor-text-tools` | Example text-command extension built as a `cdylib` |
 | `xtask` | `xtask` | Development staging, packaging, and acceptance tooling |
 
 Enforce the dependency directions in the architecture document:
@@ -68,7 +68,7 @@ Enforce the dependency directions in the architecture document:
 Follow `docs/PLUGIN_ABI.md`; it is the detailed protocol specification. The protocol remains a draft until M0 implementation and tests establish it.
 
 - Build native plugins with `crate-type = ["cdylib"]` and load them through libloading. Do not substitute Rust's `dylib` ABI for a stable extension protocol.
-- Keep the entry symbol `rnp_plugin_entry_v1`, use `extern "C"` functions and `#[repr(C)]` structures, and follow the selected Rust edition's export requirements.
+- Keep the entry symbol `rusteditor_plugin_entry_v1`, use `extern "C"` functions and `#[repr(C)]` structures, and follow the selected Rust edition's export requirements.
 - Use explicit ABI headers, fixed-width status values, pointer/length buffers, and opaque handles. Do not pass `String`, `Vec`, `Result`, trait objects, Rust references, or GUI objects across the boundary.
 - Validate ABI major/minor versions, structure sizes, buffer capacities, required capabilities, lengths, and UTF-8 boundaries before accessing optional data or applying edits. Minor versions may append fields; incompatible changes require a new major version.
 - Specify ownership, allocation/freeing responsibility, borrowing duration, thread rules, and error behavior for every ABI operation. Never free memory through another side's allocator or retain call-scoped borrowed pointers.

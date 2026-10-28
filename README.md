@@ -1,4 +1,4 @@
-# RustNotePlusPlus
+# RustEditor
 
 A Rust desktop text and code editor inspired by Notepad++. Features are separated into a Cargo workspace, with extensions provided through dynamically loaded libraries.
 

@@ -14,18 +14,18 @@ These are target directories to create progressively by milestone. The Cargo wor
 
 | Path / package | Artifact | Responsibility |
 |---|---|---|
-| apps/desktop / rnp-desktop | bin | Entry point, windows, menus, tabs, shortcuts, and application assembly |
-| crates/editor-core / rnp-editor-core | lib | Documents, editing transactions, selections, undo/redo, and revisions; independent of the GUI |
-| crates/editor-view / rnp-editor-view | lib | Text layout, visible-region rendering, hit testing, scrolling, and IME integration |
-| crates/file-io / rnp-file-io | lib | Encodings, line endings, file monitoring, safe saving, and recovery |
-| crates/commands / rnp-commands | lib | Command IDs, routing, shortcuts, and enablement conditions |
-| crates/search / rnp-search | lib | Literal/regex searches, single-file and directory searches, and replacement transactions |
-| crates/syntax / rnp-syntax | lib | Parsing, incremental highlighting, and folding information |
-| crates/settings / rnp-settings | lib | Configuration, themes, sessions, and configuration migration |
-| crates/plugin-api / rnp-plugin-api | lib | Minimal C ABI types and constants; independent of the GUI and editor core |
-| crates/plugin-sdk / rnp-plugin-sdk | lib | Rust plugin wrappers, boundary validation, and panic conversion |
-| crates/plugin-host / rnp-plugin-host | lib | Discovery, loading, negotiation, command registration, and lifecycle management |
-| plugins/text-tools / rnp-text-tools | cdylib | Example extensions such as case conversion and line sorting |
+| apps/desktop / rusteditor-desktop | bin | Entry point, windows, menus, tabs, shortcuts, and application assembly |
+| crates/editor-core / rusteditor-editor-core | lib | Documents, editing transactions, selections, undo/redo, and revisions; independent of the GUI |
+| crates/editor-view / rusteditor-editor-view | lib | Text layout, visible-region rendering, hit testing, scrolling, and IME integration |
+| crates/file-io / rusteditor-file-io | lib | Encodings, line endings, file monitoring, safe saving, and recovery |
+| crates/commands / rusteditor-commands | lib | Command IDs, routing, shortcuts, and enablement conditions |
+| crates/search / rusteditor-search | lib | Literal/regex searches, single-file and directory searches, and replacement transactions |
+| crates/syntax / rusteditor-syntax | lib | Parsing, incremental highlighting, and folding information |
+| crates/settings / rusteditor-settings | lib | Configuration, themes, sessions, and configuration migration |
+| crates/plugin-api / rusteditor-plugin-api | lib | Minimal C ABI types and constants; independent of the GUI and editor core |
+| crates/plugin-sdk / rusteditor-plugin-sdk | lib | Rust plugin wrappers, boundary validation, and panic conversion |
+| crates/plugin-host / rusteditor-plugin-host | lib | Discovery, loading, negotiation, command registration, and lifecycle management |
+| plugins/text-tools / rusteditor-text-tools | cdylib | Example extensions such as case conversion and line sorting |
 | xtask / xtask | bin | Packaging, plugin staging, acceptance checks, and release scripts |
 
 Dependency direction: desktop → view/core/file-io/commands/search/syntax/settings/plugin-host; view → core; file-io/search/syntax → core; plugin-host → plugin-api + commands/core; plugin-sdk → plugin-api; plugins → plugin-sdk. The core must not depend on the UI or plugins. Dependency cycles are prohibited.
