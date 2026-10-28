@@ -1,7 +1,7 @@
 [workspace]
 resolver = "2"
 members = [
-    "apps/desktop", "crates/editor-core", "crates/plugin-api",
+    "apps/desktop", "crates/editor-core", "crates/editor-view", "crates/plugin-api",
     "crates/plugin-sdk", "crates/plugin-host", "plugins/text-tools", "xtask",
 ]
 
@@ -13,10 +13,14 @@ publish = false
 
 [workspace.dependencies]
 rusteditor-editor-core = { path = "crates/editor-core" }
+rusteditor-editor-view = { path = "crates/editor-view" }
 rusteditor-plugin-api = { path = "crates/plugin-api" }
 rusteditor-plugin-sdk = { path = "crates/plugin-sdk" }
 rusteditor-plugin-host = { path = "crates/plugin-host" }
 eframe = { version = "=0.33.3", default-features = false, features = ["default_fonts", "glow", "x11", "wayland"] }
+egui = { version = "=0.33.3", default-features = false, features = ["default_fonts"] }
+unicode-segmentation = "=1.13.3"
+ab_glyph = "=0.2.32"
 libloading = "=0.8.9"
 serde = { version = "=1.0.228", features = ["derive"] }
 serde_json = "=1.0.145"

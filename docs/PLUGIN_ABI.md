@@ -1,6 +1,6 @@
 # Dynamic Library Plugin Protocol Draft v1
 
-Status: **implemented experimental v1.0**, pending the remaining [M0 acceptance gates](acceptance/M0.md). The canonical Rust C-layout types and status values are in [plugin-api](../crates/plugin-api/src/lib.rs); the implemented Rust wrappers are in [plugin-sdk](../crates/plugin-sdk/src/lib.rs). Linux and Windows CI real-library checks pass; macOS and older released-SDK compatibility are unverified. Rust plugins use `crate-type = ["cdylib"]`, distinct from Rust's `dylib` crate type.
+Status: **implemented experimental v1.0**, pending the remaining [M0 acceptance gates](acceptance/M0.md). The canonical Rust C-layout types and status values are in [plugin-api](../crates/plugin-api/src/lib.rs); the implemented Rust wrappers are in [plugin-sdk](../crates/plugin-sdk/src/lib.rs). Linux and Windows CI real-library checks pass; macOS remains unverified. Older SDK compatibility is not required; host and plugins target the current experimental SDK/ABI and plugins may require rebuilding after SDK changes. Rust plugins use `crate-type = ["cdylib"]`, distinct from Rust's `dylib` crate type.
 
 ## Boundaries
 
@@ -28,7 +28,7 @@ HostApiV1 includes at least logging, command registration/removal, current docum
 
 ### Implemented v1.0 Layout and Calls
 
-The 16-byte `AbiHeader` prefix is `magic: u32` (`0x52534544`), `abi_major: u16` (1), `abi_minor: u16` (0), `struct_size: u32`, and `reserved: u32` (0). The SDK checks a readable prefix and capacity before accessing the full table or writing the output prefix. The host initializes the output table, rejects larger-than-capacity returns, and rejects plugins requiring a later minor version. A newer host table can append fields; the v1.0 SDK reads only its known prefix. These negotiation checks are not a substitute for a separately built older-SDK compatibility test.
+The 16-byte `AbiHeader` prefix is `magic: u32` (`0x52534544`), `abi_major: u16` (1), `abi_minor: u16` (0), `struct_size: u32`, and `reserved: u32` (0). The SDK checks a readable prefix and capacity before accessing the full table or writing the output prefix. The host initializes the output table, rejects larger-than-capacity returns, and rejects plugins requiring a later minor version. A newer host table can append fields; the v1.0 SDK reads only its known prefix. These checks protect the current ABI boundary; they do not promise compatibility with plugins built by older SDK versions. No historical SDK compatibility fixture is required.
 
 | Table | Fields after header |
 |---|---|
@@ -100,7 +100,7 @@ M0 dispatch is synchronous and the host is not Send/Sync; callbacks reject the w
 
 Build a real text-tools cdylib and load it by absolute path from a host that does not link the plugin crate. Execute selection-to-uppercase and verify startup without plugins. Test missing symbols, incorrect major versions, short structures, missing capabilities, duplicate commands, initialization failure, insufficient buffers, revision conflicts, catchable panics, and cleanup order. Deliberately crashing test plugins must run in subprocesses rather than the ordinary test process.
 
-Validate compatibility by loading plugins built with an older SDK into a newer host. A single workspace build does not establish ABI compatibility. Build and test separately on each platform; publish architecture, ABI, and checksums with releases.
+Validate the current SDK/ABI using separately built real libraries. Older SDK compatibility is not a requirement; do not add compatibility adapters or frozen historical SDK fixtures. Keep ABI version, structure-size, capability, memory, and lifecycle validation even when older plugins are unsupported. Build and test separately on each platform; publish architecture, ABI, and checksums with releases.
 
 ## References
 

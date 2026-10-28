@@ -10,5 +10,7 @@ workspace = true
 
 [dependencies]
 rusteditor-editor-core.workspace = true
+rusteditor-editor-view.workspace = true
 rusteditor-plugin-host.workspace = true
 eframe.workspace = true
+ab_glyph.workspace = true
