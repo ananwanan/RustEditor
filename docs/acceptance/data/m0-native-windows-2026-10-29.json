@@ -1,0 +1,385 @@
+{
+    "schema_version":  1,
+    "recorded_utc":  "2026-10-28T18:19:50.2515204Z",
+    "revision":  "3a4f6c9d715a49cbfa9eeccd4e32d4c35a3de875",
+    "tracked_worktree_dirty":  true,
+    "binary_name":  "rusteditor-desktop.exe",
+    "binary_sha256":  "b66efc8e5ab66fadbb8668a3739adb76f160a6946c4e22a8ec7577f0aa475655",
+    "build_mode_operator_reported":  "release",
+    "rustc":  [
+                  "rustc 1.88.0 (6b00bc388 2025-06-23)",
+                  "binary: rustc",
+                  "commit-hash: 6b00bc3880198600130e1cf62b8f8a93494488cc",
+                  "commit-date: 2025-06-23",
+                  "host: x86_64-pc-windows-msvc",
+                  "release: 1.88.0",
+                  "LLVM version: 20.1.5"
+              ],
+    "command_arguments":  [
+                              "--no-plugins",
+                              "--empty"
+                          ],
+    "cache_condition":  "warm: one untimed GUI priming launch; OS cache not cleared",
+    "machine":  {
+                    "os":  {
+                               "caption":  "Microsoft Windows 11 专业版",
+                               "version":  "10.0.26300",
+                               "build":  "26300",
+                               "architecture":  "64 位"
+                           },
+                    "cpus":  [
+                                 {
+                                     "name":  "12th Gen Intel(R) Core(TM) i5-12600KF",
+                                     "physical_cores":  10,
+                                     "logical_processors":  16
+                                 }
+                             ],
+                    "physical_memory_bytes":  34192097280,
+                    "graphics":  [
+                                     {
+                                         "name":  "OrayIddDriver Device",
+                                         "driver_version":  "17.50.19.949",
+                                         "reported_width_pixels":  null,
+                                         "reported_height_pixels":  null,
+                                         "reported_refresh_hz":  null
+                                     },
+                                     {
+                                         "name":  "NVIDIA GeForce RTX 4060 Ti",
+                                         "driver_version":  "32.0.16.2101",
+                                         "reported_width_pixels":  2560,
+                                         "reported_height_pixels":  1440,
+                                         "reported_refresh_hz":  179
+                                     }
+                                 ],
+                    "disks":  [
+                                  {
+                                      "model":  "KINGSTON SNV2S1000G",
+                                      "media_type":  "SSD",
+                                      "bus_type":  "NVMe",
+                                      "size_bytes":  1000204886016
+                                  },
+                                  {
+                                      "model":  "ST1000LM024 HN-M101MBB",
+                                      "media_type":  "HDD",
+                                      "bus_type":  "SATA",
+                                      "size_bytes":  1000204886016
+                                  },
+                                  {
+                                      "model":  "WDC WD42HKVS-78C4GY0",
+                                      "media_type":  "HDD",
+                                      "bus_type":  "SATA",
+                                      "size_bytes":  4000787030016
+                                  },
+                                  {
+                                      "model":  "KIOXIA-EXCERIA G2 SSD",
+                                      "media_type":  "SSD",
+                                      "bus_type":  "NVMe",
+                                      "size_bytes":  1000204886016
+                                  }
+                              ],
+                    "disk_query_note":  null,
+                    "display_scale_percent_operator_reported":  125,
+                    "environment_note":  "Windows Settings original125percent2560x1440; WMI179Hz; Balanced plan; other desktop apps/coding agent active; physical-versus-remote unverified; no WPR tracing or UI automation during sampling."
+                },
+    "configuration":  {
+                          "measured_launches":  5,
+                          "settle_seconds_after_window":  5,
+                          "memory_samples_per_launch":  10,
+                          "memory_interval_ms":  100,
+                          "window_poll_interval_ms":  10,
+                          "launch_timeout_seconds":  30
+                      },
+    "limitations":  [
+                        "Window observation is a process/window diagnostic, not editable-state or frame-presentation startup.",
+                        "Working set is Windows resident process memory, not total system/GPU memory.",
+                        "Build mode and display scale are operator-reported; verify them before publishing.",
+                        "No input is injected; input-to-present latency and cold startup remain Pending."
+                    ],
+    "priming":  {
+                    "index":  0,
+                    "priming":  true,
+                    "started_utc":  "2026-10-28T18:19:53.8504773Z",
+                    "process_id":  25248,
+                    "launch_to_window_observed_ms":  56.664100000000005,
+                    "working_set_bytes":  [
+                                              156512256,
+                                              156512256,
+                                              156512256,
+                                              156512256,
+                                              156512256,
+                                              156512256,
+                                              156512256,
+                                              156512256,
+                                              156512256,
+                                              156512256
+                                          ],
+                    "private_bytes":  [
+                                          158081024,
+                                          158081024,
+                                          158081024,
+                                          158081024,
+                                          158081024,
+                                          158081024,
+                                          158081024,
+                                          158081024,
+                                          158081024,
+                                          158081024
+                                      ],
+                    "memory_sample_elapsed_ms":  [
+                                                     5082.5158,
+                                                     5199.2733,
+                                                     5326.1419000000005,
+                                                     5482.1346,
+                                                     5604.3397,
+                                                     5731.4931000000006,
+                                                     5859.0592000000006,
+                                                     5981.8103,
+                                                     6110.4065,
+                                                     6219.1831
+                                                 ],
+                    "cleanup":  "normal close",
+                    "failure":  null
+                },
+    "samples":  [
+                    {
+                        "index":  1,
+                        "priming":  false,
+                        "started_utc":  "2026-10-28T18:20:00.2172355Z",
+                        "process_id":  28656,
+                        "launch_to_window_observed_ms":  52.615700000000004,
+                        "working_set_bytes":  [
+                                                  156041216,
+                                                  156041216,
+                                                  156041216,
+                                                  156041216,
+                                                  156041216,
+                                                  156041216,
+                                                  156041216,
+                                                  156041216,
+                                                  156041216,
+                                                  156041216
+                                              ],
+                        "private_bytes":  [
+                                              156573696,
+                                              156573696,
+                                              156573696,
+                                              156573696,
+                                              156573696,
+                                              156573696,
+                                              156573696,
+                                              156573696,
+                                              156573696,
+                                              156573696
+                                          ],
+                        "memory_sample_elapsed_ms":  [
+                                                         5071.1471,
+                                                         5180.0415,
+                                                         5289.1536000000006,
+                                                         5398.5822,
+                                                         5507.3303000000005,
+                                                         5618.3247,
+                                                         5728.1608000000006,
+                                                         5836.0470000000005,
+                                                         5949.7661000000007,
+                                                         6054.812
+                                                     ],
+                        "cleanup":  "normal close",
+                        "failure":  null
+                    },
+                    {
+                        "index":  2,
+                        "priming":  false,
+                        "started_utc":  "2026-10-28T18:20:06.4116611Z",
+                        "process_id":  34572,
+                        "launch_to_window_observed_ms":  45.6948,
+                        "working_set_bytes":  [
+                                                  169250816,
+                                                  169369600,
+                                                  169369600,
+                                                  169369600,
+                                                  169369600,
+                                                  169369600,
+                                                  169369600,
+                                                  169369600,
+                                                  169369600,
+                                                  169369600
+                                              ],
+                        "private_bytes":  [
+                                              168087552,
+                                              168087552,
+                                              168087552,
+                                              168087552,
+                                              168087552,
+                                              168087552,
+                                              168087552,
+                                              168087552,
+                                              168087552,
+                                              168087552
+                                          ],
+                        "memory_sample_elapsed_ms":  [
+                                                         5064.2272,
+                                                         5186.5893000000005,
+                                                         5311.0473,
+                                                         5433.5665,
+                                                         5558.6475,
+                                                         5683.3033000000005,
+                                                         5808.6415000000006,
+                                                         5934.4621000000006,
+                                                         6059.4636,
+                                                         6184.9908000000005
+                                                     ],
+                        "cleanup":  "normal close",
+                        "failure":  null
+                    },
+                    {
+                        "index":  3,
+                        "priming":  false,
+                        "started_utc":  "2026-10-28T18:20:12.8149434Z",
+                        "process_id":  42776,
+                        "launch_to_window_observed_ms":  41.8721,
+                        "working_set_bytes":  [
+                                                  155963392,
+                                                  155963392,
+                                                  155963392,
+                                                  155963392,
+                                                  155963392,
+                                                  155963392,
+                                                  155963392,
+                                                  155963392,
+                                                  155963392,
+                                                  155963392
+                                              ],
+                        "private_bytes":  [
+                                              155942912,
+                                              155942912,
+                                              155942912,
+                                              155942912,
+                                              155942912,
+                                              155942912,
+                                              155942912,
+                                              155942912,
+                                              155942912,
+                                              155942912
+                                          ],
+                        "memory_sample_elapsed_ms":  [
+                                                         5058.2159,
+                                                         5168.4648000000007,
+                                                         5278.9188,
+                                                         5388.8938,
+                                                         5514.4597,
+                                                         5638.5250000000005,
+                                                         5747.6751,
+                                                         5872.8463,
+                                                         5983.4091,
+                                                         6110.4525
+                                                     ],
+                        "cleanup":  "normal close",
+                        "failure":  null
+                    },
+                    {
+                        "index":  4,
+                        "priming":  false,
+                        "started_utc":  "2026-10-28T18:20:19.0834563Z",
+                        "process_id":  37432,
+                        "launch_to_window_observed_ms":  44.398700000000005,
+                        "working_set_bytes":  [
+                                                  156037120,
+                                                  156037120,
+                                                  156037120,
+                                                  156037120,
+                                                  156037120,
+                                                  156037120,
+                                                  156037120,
+                                                  156037120,
+                                                  156037120,
+                                                  156037120
+                                              ],
+                        "private_bytes":  [
+                                              156651520,
+                                              156651520,
+                                              156651520,
+                                              156651520,
+                                              156651520,
+                                              156651520,
+                                              156651520,
+                                              156651520,
+                                              156651520,
+                                              156651520
+                                          ],
+                        "memory_sample_elapsed_ms":  [
+                                                         5064.7204,
+                                                         5174.054,
+                                                         5282.6605,
+                                                         5391.9972000000007,
+                                                         5502.2655,
+                                                         5615.7581,
+                                                         5726.8545,
+                                                         5835.8375000000005,
+                                                         5944.4855000000007,
+                                                         6051.3164000000006
+                                                     ],
+                        "cleanup":  "normal close",
+                        "failure":  null
+                    },
+                    {
+                        "index":  5,
+                        "priming":  false,
+                        "started_utc":  "2026-10-28T18:20:25.2773313Z",
+                        "process_id":  27804,
+                        "launch_to_window_observed_ms":  40.4752,
+                        "working_set_bytes":  [
+                                                  156069888,
+                                                  156069888,
+                                                  156069888,
+                                                  156069888,
+                                                  156069888,
+                                                  156069888,
+                                                  156069888,
+                                                  156069888,
+                                                  156069888,
+                                                  156069888
+                                              ],
+                        "private_bytes":  [
+                                              157556736,
+                                              157556736,
+                                              157556736,
+                                              157556736,
+                                              157556736,
+                                              157556736,
+                                              157556736,
+                                              157556736,
+                                              157556736,
+                                              157556736
+                                          ],
+                        "memory_sample_elapsed_ms":  [
+                                                         5047.2537,
+                                                         5157.3159000000005,
+                                                         5267.1141000000007,
+                                                         5374.0178000000005,
+                                                         5484.7984000000006,
+                                                         5595.4313,
+                                                         5704.9401000000007,
+                                                         5814.1288,
+                                                         5923.7386000000006,
+                                                         6033.7461
+                                                     ],
+                        "cleanup":  "normal close",
+                        "failure":  null
+                    }
+                ],
+    "summary":  {
+                    "launch_to_window_observed_ms_p50":  44.398700000000005,
+                    "launch_to_window_observed_ms_p95":  52.615700000000004,
+                    "idle_working_set_mib_p50":  148.8125,
+                    "idle_working_set_mib_max":  161.5234375,
+                    "idle_private_mib_p50":  149.39453125,
+                    "idle_private_mib_max":  160.30078125
+                },
+    "run_failure":  null,
+    "acceptance":  {
+                       "warm_editable_startup":  "Pending: correlate launch with editable presented frame.",
+                       "cold_editable_startup":  "Pending: controlled reboot/cache condition and presentation evidence required.",
+                       "input_to_present_latency":  "Pending: correlated input and displayed-frame evidence required.",
+                       "idle_memory":  "Measured at or above the 150 MiB idle working-set budget."
+                   }
+}

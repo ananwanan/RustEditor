@@ -1,4 +1,7 @@
 //! Internal CPU/allocation diagnostics; no native input or display presentation.
+#[path = "../src/layout_payload.rs"]
+mod layout_payload;
+
 use egui::{Event, FontFamily, Id, ImeEvent, Key, Modifiers};
 use rusteditor_editor_core::{Document, DocumentId, Selection};
 use rusteditor_editor_view::EditorView;
@@ -20,6 +23,8 @@ static LIVE: AtomicUsize = AtomicUsize::new(0);
 static PEAK: AtomicUsize = AtomicUsize::new(0);
 static ALLOCATED: AtomicUsize = AtomicUsize::new(0);
 static CALLS: AtomicUsize = AtomicUsize::new(0);
+static DEALLOCATED: AtomicUsize = AtomicUsize::new(0);
+static DEALLOCATION_CALLS: AtomicUsize = AtomicUsize::new(0);
 
 fn added(size: usize) {
     let live = LIVE.fetch_add(size, Relaxed) + size;
@@ -27,6 +32,14 @@ fn added(size: usize) {
         ALLOCATED.fetch_add(size, Relaxed);
         CALLS.fetch_add(1, Relaxed);
         PEAK.fetch_max(live, Relaxed);
+    }
+}
+
+fn released(size: usize) {
+    LIVE.fetch_sub(size, Relaxed);
+    if ACTIVE.load(Relaxed) {
+        DEALLOCATED.fetch_add(size, Relaxed);
+        DEALLOCATION_CALLS.fetch_add(1, Relaxed);
     }
 }
 
@@ -51,7 +64,7 @@ unsafe impl GlobalAlloc for CountingAllocator {
         ptr
     }
     unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
-        LIVE.fetch_sub(layout.size(), Relaxed);
+        released(layout.size());
         // SAFETY: System allocated ptr with this layout, as required by caller.
         unsafe { System.dealloc(ptr, layout) };
     }
@@ -59,7 +72,7 @@ unsafe impl GlobalAlloc for CountingAllocator {
         // SAFETY: The caller supplies a System allocation and a valid new size.
         let result = unsafe { System.realloc(ptr, layout, size) };
         if !result.is_null() {
-            LIVE.fetch_sub(layout.size(), Relaxed);
+            released(layout.size());
             added(size);
         }
         result
@@ -73,6 +86,8 @@ fn measured<T>(f: impl FnOnce() -> T) -> (T, Value) {
     let before = LIVE.load(Relaxed);
     ALLOCATED.store(0, Relaxed);
     CALLS.store(0, Relaxed);
+    DEALLOCATED.store(0, Relaxed);
+    DEALLOCATION_CALLS.store(0, Relaxed);
     PEAK.store(before, Relaxed);
     ACTIVE.store(true, Relaxed);
     let start = Instant::now();
@@ -81,12 +96,15 @@ fn measured<T>(f: impl FnOnce() -> T) -> (T, Value) {
     ACTIVE.store(false, Relaxed);
     let allocated = ALLOCATED.load(Relaxed);
     let calls = CALLS.load(Relaxed);
+    let deallocated = DEALLOCATED.load(Relaxed);
+    let deallocation_calls = DEALLOCATION_CALLS.load(Relaxed);
     let after = LIVE.load(Relaxed);
     let peak = PEAK.load(Relaxed);
     (
         value,
         json!({"cpu_ns": ns, "allocated_bytes": allocated,
-        "allocation_calls": calls, "live_bytes_before": before,
+        "allocation_calls": calls, "deallocated_bytes": deallocated,
+        "deallocation_calls": deallocation_calls, "live_bytes_before": before,
         "live_bytes_after": after, "peak_live_bytes": peak,
         "peak_extra_live_bytes": peak.saturating_sub(before)}),
     )
@@ -272,10 +290,14 @@ fn main() {
                             0
                         },
                     );
+                    // Escape releases egui focus. Every sample must create a
+                    // real composition rather than measuring an unfocused no-op.
+                    h.view.request_focus();
                     h.frame(vec![
                         Event::Ime(ImeEvent::Enabled),
                         Event::Ime(ImeEvent::Preedit("ni".into())),
                     ]);
+                    assert!(h.view.is_composing(), "preedit setup: {scenario}/{i}");
                     if scenario == "ime-cancel" {
                         vec![key(Key::Escape, Modifiers::NONE)]
                     } else if scenario == "ime-native-clear-commit" {
@@ -294,6 +316,15 @@ fn main() {
                 _ => vec![],
             };
             let ((shapes, cached), mut sample) = measured(|| h.frame(events));
+            if matches!(
+                scenario,
+                "ime-commit" | "ime-cancel" | "ime-native-clear-commit"
+            ) {
+                assert!(
+                    !h.view.is_composing(),
+                    "composition consumed: {scenario}/{i}"
+                );
+            }
             sample["index"] = json!(i);
             sample["shape_count"] = json!(shapes);
             sample["egui_cached_galleys"] = json!(cached);
@@ -354,6 +385,65 @@ fn main() {
         }
         rows.push(json!({"scenario": scenario, "samples": samples}));
     }
+    // Keep the original scenarios above in the same order. These probes use
+    // the exact production accounting helper and put all painting outside the
+    // timed interval so drop and admission traversal are measured separately.
+    for scenario in [
+        "selection-drop-first",
+        "selection-drop-all",
+        "payload-accounting-base",
+        "payload-accounting-base-selected",
+    ] {
+        let mut samples = Vec::new();
+        for i in 0..count {
+            let mut selected = base.clone();
+            let scalars = if scenario == "selection-drop-first" {
+                usize::from(!text.is_empty())
+            } else {
+                text.chars().count()
+            };
+            if scenario != "payload-accounting-base" {
+                let range = egui::text::CCursorRange::two(
+                    egui::text::CCursor::new(0),
+                    egui::text::CCursor::new(scalars),
+                );
+                egui::text_selection::visuals::paint_text_selection(
+                    &mut selected,
+                    &ctx.style().visuals,
+                    &range,
+                    None,
+                );
+            }
+            let (accounted_bytes, mut sample) = match scenario {
+                "selection-drop-first" | "selection-drop-all" => {
+                    let (_, sample) = measured(|| drop(selected));
+                    (None, sample)
+                }
+                "payload-accounting-base" => {
+                    let (bytes, sample) =
+                        measured(|| black_box(layout_payload::retained_bytes([base.as_ref()])));
+                    drop(selected);
+                    (Some(bytes), sample)
+                }
+                _ => {
+                    let (bytes, sample) = measured(|| {
+                        black_box(layout_payload::retained_bytes([
+                            base.as_ref(),
+                            selected.as_ref(),
+                        ]))
+                    });
+                    drop(selected);
+                    (Some(bytes), sample)
+                }
+            };
+            sample["index"] = json!(i);
+            if let Some(bytes) = accounted_bytes {
+                sample["accounted_retained_bytes"] = json!(bytes);
+            }
+            samples.push(sample);
+        }
+        rows.push(json!({"scenario": scenario, "samples": samples}));
+    }
     let probe = cache_probe(&ctx, &base, &font, color);
     println!(
         "{}",
@@ -361,7 +451,7 @@ fn main() {
         "build": {"debug_assertions": cfg!(debug_assertions), "target_os":std::env::consts::OS,
             "target_arch":std::env::consts::ARCH},
         "frame_scope": "Context::run, EditorView::show, output drop; no tessellation, native input, GPU or display",
-        "allocator_scope": "successful Rust System allocation/reallocation requested bytes; reallocation counts full new size; live/peak exclude native/GPU allocations and allocator overhead",
+        "allocator_scope": "successful Rust System allocation/reallocation requested bytes and deallocated payloads/calls; successful reallocation counts full old size released and new size allocated, including in-place changes; live/peak exclude native/GPU allocations and allocator overhead",
         "samples_per_scenario": count, "viewport_points": [900,600], "pixels_per_point": 1.0,
         "text_bytes": text.len(), "base_galley_rows": base.rows.len(), "base_galley_vertices": base.num_vertices,
         "egui_cache_probe": probe, "scenarios": rows})

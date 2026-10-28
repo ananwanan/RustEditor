@@ -37,7 +37,8 @@ def fixtures():
 def summarize(samples):
     """Nearest-rank p50/p95; preserve every original sample in the report."""
     result = {}
-    for metric in ("cpu_ns", "allocated_bytes", "allocation_calls", "live_bytes_before",
+    for metric in ("cpu_ns", "allocated_bytes", "allocation_calls",
+                   "deallocated_bytes", "deallocation_calls", "live_bytes_before",
                    "live_bytes_after", "peak_live_bytes", "peak_extra_live_bytes"):
         values = sorted(sample[metric] for sample in samples)
         result[metric] = {"p50": values[math.ceil(len(values) * .5) - 1],

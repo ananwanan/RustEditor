@@ -1,0 +1,55 @@
+{
+  "source_base": "3a4f6c9d715a49cbfa9eeccd4e32d4c35a3de875",
+  "branch": "feat/m0-native-acceptance",
+  "tracked_sources_dirty_at_build": true,
+  "normalized_lf_source_sha256": {
+    "apps/desktop/Cargo.toml": "51afbb1afdb96f6ccaed199a8bab800b2fa1d285ea8611364a72a897e42c1398",
+    "apps/desktop/src/fonts.rs": "277d8ec7661ba231f4a19d6b011e321783ab6bbb299592a2b0df6245c2dcb357",
+    "apps/desktop/src/main.rs": "9280766af1a53377584e5073a2c664c35300f464282209145946d427a03b29e7",
+    "apps/desktop/src/native.rs": "66f6ce8648ec6dbe618e787d66cfacbaf90c506594cb5e241a559127d88283e6",
+    "apps/desktop/src/view.rs": "190ef4ae3d0f78ca65b4045e0364d4988f27d638ee7aa28000c92c70cd4ad27b",
+    "Cargo.lock": "19adfddf11acb22571a0430ec30f4d87926d8ed8ed544cac1e44fd42c892307f",
+    "Cargo.toml": "dc1d0d554b130c6c032d55fcc57924617c2bd0d462903c6857a80ae573a6b6bb",
+    "crates/editor-core/Cargo.toml": "6151a80dccacf90dc858f76c41b57d02decafb00ea29e62fda92a3098c6c7a77",
+    "crates/editor-core/src/lib.rs": "cb09077f8b1013fd56f9a342e1fe81a60718156327192f670b3961d8f0bce7dc",
+    "crates/editor-view/Cargo.toml": "d9d4b507d6f1e8abdab9ffb575df0f8d1da15d40e1dcb068d2c8798ec66381a4",
+    "crates/editor-view/examples/render_diagnostics.rs": "cfebc87993196b49e668728d31ee1367f707b7e1d0855efd480d8b919d727fba",
+    "crates/editor-view/src/grapheme.rs": "32a4d64450953052cf21e0d97c911848a2fca3358fb371714c8b68727de1a97d",
+    "crates/editor-view/src/input.rs": "57fe30c2285b00e47f0f38a70bb10667407c020c6da4827ece3b5fd4abeed1a2",
+    "crates/editor-view/src/layout_cache.rs": "a6af1e200c99e32cea5a350ba471d79d9ae3c1b16f422df519a501a6f0bdd53c",
+    "crates/editor-view/src/layout_payload.rs": "250e61afc7235251b004778b3b60d593e4292f212dd8f811d30e75293997c1a7",
+    "crates/editor-view/src/lib.rs": "1bb450ced0d2687c456646ce2c37f0a06ffbed3b2f1679e598a8705caa355ca7",
+    "crates/editor-view/src/tests.rs": "5d761141ed71616e661090e8ed0e10e8fec714f32af9866ee35e891d3d97c068",
+    "crates/plugin-api/build.rs": "cb4fa625a540460957eb03c9505af138b4e49c5a8c4e10a6a4b78a6937e2df68",
+    "crates/plugin-api/Cargo.toml": "d42476ec113358f8a3a7449dad48d1d96a3a167f6f77943ade443645e4fe1218",
+    "crates/plugin-api/src/lib.rs": "cc0348e742b3a47c4393cfd051549f46b2a9c22a23c92694eef4c4d80124c065",
+    "crates/plugin-host/Cargo.toml": "7d4c0baa9f0c47713e7db74b3ec70e91139098f4937892d56a5fa461dc6aadb6",
+    "crates/plugin-host/src/callbacks.rs": "bcb93423d68fb014a95ff94f68c306bdd26808c1ecfdafae25b38c7eb7b7ac33",
+    "crates/plugin-host/src/lib.rs": "0f2fb1efd8114d9a08f06bfbf8998070ca45618be6b414c33056d6a6ae3e7448",
+    "crates/plugin-host/src/manifest.rs": "2da08d07070ebd51f3577a75113df1b7483701af9337074abcaeaf8f9d08d839",
+    "crates/plugin-host/tests/dynamic.rs": "6ee78fc7abec894cb291fb2cfc5d92491e984384381cd7a2715851952565944f",
+    "crates/plugin-sdk/Cargo.toml": "311f8700068ce0cb51d3a32d6a596cbb86e447efb95d82364bb3f62e75a5ee23",
+    "crates/plugin-sdk/src/lib.rs": "9774b900c1c5a367447e9cf3e066270cfb71e42a50a8ce332ba86dea7bb1f565",
+    "plugins/text-tools/Cargo.toml": "a62586431419e814397e6b36eaa3be42f88ea9f8d19083fc2b8853ce59ce56c2",
+    "plugins/text-tools/src/lib.rs": "5242d0e4f657790aa6b036ac02702239884163e1d4878c05b655bb146975582d",
+    "rust-toolchain.toml": "6a3177dca3783745b00765ea571974808dad2644947fc0a8df5927048edf13a5",
+    "xtask/Cargo.toml": "72f1a4139166fa3957ff79bfe9697dbf8f4d53267ebe6ca2003c4150ccd790e2",
+    "xtask/src/main.rs": "cf10e04cb7412f245d0be68784c981ddcd0acec23a61cb561efc2deb7f5d1e96",
+    "tests/fixtures/probe.rs": "634b8b431d5f4553ebe4efa057ba7f26318efe383f392c580597ae2b85cdd827"
+  },
+  "binary_sha256": {
+    "rusteditor-desktop.exe": "b66efc8e5ab66fadbb8668a3739adb76f160a6946c4e22a8ec7577f0aa475655",
+    "rusteditor_text_tools.dll": "6dee97d4afc69aef569341317cd05aa5eef77dd6177fe865f9da5089f443af81",
+    "examples/render_diagnostics.exe": "18d766af6f6b01bab746c0287746a4f7678cd1e8df3a7f2e3e6ca77f32c52327"
+  },
+  "build_commands": [
+    "cargo build --release --locked -p rusteditor-editor-view --example render_diagnostics",
+    "cargo build --release --locked -p rusteditor-desktop -p rusteditor-text-tools"
+  ],
+  "policy": "Final production cache policy equals the matched before run. Only accounting factoring and diagnostic changes persist; the 8 MiB trial was reverted.",
+  "limitations": [
+    "Raw reports stamp the build-time base commit plus dirty state. Source fingerprints identify the exact final Rust sources carried by the delivery commit.",
+    "MSVC executable hashes differ across builds; binary reproducibility is not claimed.",
+    "UI observations use Windows SendInput, not physical keyboard acceptance or presentation timing."
+  ]
+}

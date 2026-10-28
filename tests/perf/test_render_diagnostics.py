@@ -19,7 +19,8 @@ class RenderDiagnosticTests(unittest.TestCase):
         self.assertNotIn(b"\n", workloads["long-line"][0])
 
     def test_statistics_use_nearest_rank_without_discarding_outliers(self):
-        metrics = ("cpu_ns", "allocated_bytes", "allocation_calls", "live_bytes_before",
+        metrics = ("cpu_ns", "allocated_bytes", "allocation_calls",
+                   "deallocated_bytes", "deallocation_calls", "live_bytes_before",
                    "live_bytes_after", "peak_live_bytes", "peak_extra_live_bytes")
         samples = [dict.fromkeys(metrics, value) for value in range(20, 0, -1)]
         result = summarize(samples)

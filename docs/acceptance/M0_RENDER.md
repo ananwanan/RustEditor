@@ -1,5 +1,7 @@
 # Internal Diagnostic Before/After Comparison
 
+The 2026-10-28 tables below are historical. The [2026-10-29 matched review](#2026-10-29-matched-cache-review) adds corrected cancellation sampling, isolated destruction/accounting probes, a rejected memory restriction, and a final repeat. Historical cancellation percentiles largely include unfocused no-op frames after Escape; preserve them without treating them as repeated-cancellation costs.
+
 Date: 2026-10-28. See [M0 acceptance](M0.md#m0-render-diagnostics-and-limited-optimization) for source/binary provenance, hardware, methodology, cache decisions, memory tradeoffs and remaining gates. The [protocol](../../tests/perf/README.md#internal-render-cpu-and-allocation-diagnostics) defines each scope. Raw reports: [before](data/m0-render-before-2026-10-28.json) and [after](data/m0-render-after-2026-10-28.json), with 30 samples/scenario. These are instrumented internal diagnostics; live counters include fonts, egui and retained diagnostic JSON. No table value establishes native startup or input-to-present latency.
 
 CPU timings in milliseconds; allocations/live counters in MiB; CPU p50/p95 and other counters p50. Values are rounded to three decimals; 0.000 can represent a small nonzero duration. No native input or presentation evidence.
@@ -83,3 +85,88 @@ CPU timings in milliseconds; allocations/live counters in MiB; CPU p50/p95 and o
 | egui-layout-cache-hit | 0.289/0.305 -> 0.304/0.339 | 1.000 -> 1.000 | 147.672 -> 147.672 | 1.000 -> 1.000 |
 | selection-mutate-first | 23.066/24.449 -> 23.491/25.390 | 133.802 -> 133.802 | 147.696 -> 147.696 | 99.841 -> 99.841 |
 | selection-mutate-all | 24.828/25.924 -> 25.316/26.312 | 133.802 -> 133.802 | 147.719 -> 147.719 | 99.841 -> 99.841 |
+
+## 2026-10-29 matched cache review
+
+The [native follow-up](M0_NATIVE.md) owns the decision and provenance. Before and final use identical production source fingerprints and the corrected 19-scenario harness; CPU differences between those two runs describe variation, not an optimization. The 8 MiB trial is rejected. Each report retains 30 samples per scenario, all outliers and deallocation counters. Earlier cancellation percentiles above largely measured an unfocused no-op after Escape and cannot be compared with the corrected series.
+
+CPU columns are p50/p95 milliseconds; allocation/live columns are p50 MiB. These exclude native input, tessellation, GPU and display presentation. `0.000` may be below displayed precision.
+
+| Workload / scenario | Before CPU | 8 MiB trial CPU | Final CPU | Allocated before / trial / final | Live after before / trial / final |
+|---|---|---|---|---|---|
+| empty / idle | 0.006/0.012 | 0.006/0.009 | 0.006/0.009 | 0.008 / 0.008 / 0.008 | 62.584 / 62.584 / 62.584 |
+| empty / caret | 0.006/0.024 | 0.006/0.012 | 0.006/0.010 | 0.009 / 0.009 / 0.009 | 62.649 / 62.649 / 62.649 |
+| empty / selection-change | 0.006/0.008 | 0.006/0.008 | 0.006/0.009 | 0.009 / 0.009 / 0.009 | 62.713 / 62.713 / 62.713 |
+| empty / selection-idle-all | 0.006/0.007 | 0.005/0.006 | 0.005/0.006 | 0.008 / 0.008 / 0.008 | 62.777 / 62.777 / 62.777 |
+| empty / edit | 0.006/0.010 | 0.006/0.010 | 0.008/0.013 | 0.009 / 0.009 / 0.009 | 62.843 / 62.843 / 62.843 |
+| empty / edit-after-idle | 0.006/0.009 | 0.006/0.009 | 0.008/0.010 | 0.009 / 0.009 / 0.009 | 62.907 / 62.907 / 62.907 |
+| empty / ime-preedit | 0.008/0.047 | 0.007/0.033 | 0.007/0.073 | 0.010 / 0.010 / 0.010 | 62.972 / 62.972 / 62.972 |
+| empty / ime-repeat | 0.005/0.007 | 0.006/0.007 | 0.006/0.006 | 0.009 / 0.009 / 0.009 | 63.035 / 63.035 / 63.035 |
+| empty / ime-commit | 0.006/0.008 | 0.006/0.007 | 0.006/0.008 | 0.009 / 0.009 / 0.009 | 63.100 / 63.100 / 63.100 |
+| empty / ime-cancel | 0.005/0.006 | 0.005/0.006 | 0.008/0.009 | 0.009 / 0.009 / 0.009 | 63.163 / 63.163 / 63.163 |
+| empty / ime-native-clear-commit | 0.006/0.007 | 0.006/0.014 | 0.010/0.011 | 0.009 / 0.009 / 0.009 | 63.228 / 63.228 / 63.228 |
+| empty / text-copy-only | 0.000/0.000 | 0.000/0.000 | 0.000/0.000 | 0.000 / 0.000 / 0.000 | 63.266 / 63.266 / 63.266 |
+| empty / egui-layout-cache-hit | 0.000/0.000 | 0.000/0.000 | 0.000/0.000 | 0.000 / 0.000 / 0.000 | 63.290 / 63.290 / 63.290 |
+| empty / selection-mutate-first | 0.000/0.000 | 0.000/0.000 | 0.000/0.000 | 0.000 / 0.000 / 0.000 | 63.314 / 63.314 / 63.314 |
+| empty / selection-mutate-all | 0.000/0.000 | 0.000/0.000 | 0.000/0.000 | 0.000 / 0.000 / 0.000 | 63.339 / 63.339 / 63.339 |
+| empty / selection-drop-first | 0.000/0.000 | 0.000/0.000 | 0.000/0.000 | 0.000 / 0.000 / 0.000 | 63.363 / 63.363 / 63.363 |
+| empty / selection-drop-all | 0.000/0.000 | 0.000/0.000 | 0.000/0.000 | 0.000 / 0.000 / 0.000 | 63.387 / 63.387 / 63.387 |
+| empty / payload-accounting-base | 0.000/0.000 | 0.000/0.000 | 0.000/0.000 | 0.000 / 0.000 / 0.000 | 63.412 / 63.412 / 63.412 |
+| empty / payload-accounting-base-selected | 0.000/0.000 | 0.000/0.000 | 0.000/0.000 | 0.000 / 0.000 / 0.000 | 63.436 / 63.436 / 63.436 |
+| lf / idle | 0.340/0.423 | 0.344/0.400 | 0.433/0.513 | 1.009 / 1.009 / 1.009 | 134.018 / 134.018 / 134.019 |
+| lf / caret | 0.393/0.428 | 0.336/0.381 | 0.379/0.536 | 1.009 / 1.009 / 1.009 | 134.083 / 134.083 / 134.083 |
+| lf / selection-change | 0.508/0.743 | 0.557/0.683 | 0.540/0.750 | 1.009 / 1.009 / 1.009 | 134.179 / 134.179 / 134.179 |
+| lf / selection-idle-all | 0.462/0.580 | 48.389/52.447 | 0.490/0.714 | 1.009 / 135.655 / 1.009 | 235.575 / 134.211 / 235.575 |
+| lf / edit | 1.477/1.706 | 1.433/1.783 | 1.351/1.712 | 4.009 / 4.009 / 4.009 | 203.701 / 203.701 / 203.701 |
+| lf / edit-after-idle | 23.952/28.195 | 24.079/26.791 | 23.709/26.780 | 83.228 / 83.228 / 83.228 | 203.765 / 203.765 / 203.765 |
+| lf / ime-preedit | 1.205/28.868 | 1.201/27.925 | 1.259/26.683 | 2.337 / 2.337 / 2.337 | 204.163 / 204.163 / 204.163 |
+| lf / ime-repeat | 0.358/0.451 | 0.340/0.429 | 0.373/0.481 | 1.009 / 1.009 / 1.009 | 134.801 / 134.801 / 134.801 |
+| lf / ime-commit | 1.738/2.214 | 1.592/2.041 | 1.626/2.096 | 4.009 / 4.009 / 4.009 | 203.964 / 203.964 / 203.964 |
+| lf / ime-cancel | 1.080/1.220 | 0.948/1.121 | 1.067/1.308 | 2.009 / 2.009 / 2.009 | 204.020 / 204.020 / 204.020 |
+| lf / ime-native-clear-commit | 1.575/1.793 | 1.532/2.063 | 1.748/2.267 | 4.009 / 4.009 / 4.009 | 204.093 / 204.093 / 204.093 |
+| lf / text-copy-only | 0.253/0.303 | 0.253/0.273 | 0.228/0.248 | 1.000 / 1.000 / 1.000 | 133.697 / 133.697 / 133.697 |
+| lf / egui-layout-cache-hit | 0.352/0.394 | 0.326/0.398 | 0.342/0.437 | 1.000 / 1.000 / 1.000 | 133.722 / 133.722 / 133.722 |
+| lf / selection-mutate-first | 0.204/0.213 | 0.206/0.215 | 0.207/0.344 | 0.327 / 0.327 / 0.327 | 133.746 / 133.746 / 133.746 |
+| lf / selection-mutate-all | 47.376/50.550 | 47.045/49.387 | 47.357/52.918 | 134.646 / 134.646 / 134.646 | 133.771 / 133.771 / 133.771 |
+| lf / selection-drop-first | 0.098/0.121 | 0.099/0.122 | 0.099/0.123 | 0.000 / 0.000 / 0.000 | 133.795 / 133.795 / 133.795 |
+| lf / selection-drop-all | 10.505/12.063 | 7.886/10.799 | 10.752/14.569 | 0.000 / 0.000 / 0.000 | 133.818 / 133.818 / 133.818 |
+| lf / payload-accounting-base | 0.070/0.135 | 0.059/0.131 | 0.070/0.188 | 0.000 / 0.000 / 0.000 | 133.843 / 133.843 / 133.843 |
+| lf / payload-accounting-base-selected | 0.385/0.489 | 0.376/0.473 | 0.378/0.532 | 0.000 / 0.000 / 0.000 | 235.232 / 235.232 / 235.232 |
+| crlf-normalized / idle | 0.133/0.148 | 0.131/0.139 | 0.133/0.155 | 0.989 / 0.989 / 0.989 | 132.627 / 132.627 / 132.627 |
+| crlf-normalized / caret | 0.133/0.145 | 0.132/0.141 | 0.133/0.149 | 0.989 / 0.989 / 0.989 | 132.691 / 132.691 / 132.691 |
+| crlf-normalized / selection-change | 0.294/0.398 | 0.291/0.420 | 0.307/0.429 | 0.989 / 0.989 / 0.989 | 132.787 / 132.787 / 132.787 |
+| crlf-normalized / selection-idle-all | 0.223/0.273 | 46.718/51.797 | 0.236/0.430 | 0.989 / 132.993 / 0.989 | 232.194 / 132.819 / 232.194 |
+| crlf-normalized / edit | 0.448/0.950 | 0.486/1.107 | 0.448/0.939 | 3.931 / 3.931 / 3.931 | 200.958 / 200.958 / 200.958 |
+| crlf-normalized / edit-after-idle | 22.494/27.589 | 23.109/23.815 | 24.012/27.306 | 81.636 / 81.636 / 81.636 | 201.022 / 201.022 / 201.022 |
+| crlf-normalized / ime-preedit | 0.733/28.582 | 0.885/27.342 | 0.685/26.321 | 2.291 / 2.291 / 2.291 | 201.414 / 201.414 / 201.414 |
+| crlf-normalized / ime-repeat | 0.139/0.414 | 0.145/0.427 | 0.137/0.352 | 0.989 / 0.989 / 0.989 | 133.403 / 133.403 / 133.403 |
+| crlf-normalized / ime-commit | 0.621/0.996 | 0.621/0.939 | 0.625/0.903 | 3.931 / 3.931 / 3.931 | 201.222 / 201.222 / 201.222 |
+| crlf-normalized / ime-cancel | 0.480/0.594 | 0.791/0.936 | 0.492/0.734 | 1.969 / 1.969 / 1.969 | 201.278 / 201.278 / 201.278 |
+| crlf-normalized / ime-native-clear-commit | 0.629/0.945 | 0.677/1.161 | 0.633/0.913 | 3.931 / 3.931 / 3.931 | 201.350 / 201.350 / 201.350 |
+| crlf-normalized / text-copy-only | 0.038/0.054 | 0.041/0.067 | 0.037/0.057 | 0.980 / 0.980 / 0.980 | 132.325 / 132.325 / 132.325 |
+| crlf-normalized / egui-layout-cache-hit | 0.126/0.131 | 0.128/0.132 | 0.123/0.132 | 0.980 / 0.980 / 0.980 | 132.349 / 132.349 / 132.349 |
+| crlf-normalized / selection-mutate-first | 0.201/0.243 | 0.202/0.218 | 0.199/0.220 | 0.320 / 0.320 / 0.320 | 132.374 / 132.374 / 132.374 |
+| crlf-normalized / selection-mutate-all | 46.401/48.727 | 45.802/47.940 | 46.800/49.355 | 132.004 / 132.004 / 132.004 | 132.398 / 132.398 / 132.398 |
+| crlf-normalized / selection-drop-first | 0.097/0.114 | 0.097/0.107 | 0.096/0.104 | 0.000 / 0.000 / 0.000 | 132.422 / 132.422 / 132.422 |
+| crlf-normalized / selection-drop-all | 10.274/11.643 | 7.592/10.543 | 10.525/11.545 | 0.000 / 0.000 / 0.000 | 132.446 / 132.446 / 132.446 |
+| crlf-normalized / payload-accounting-base | 0.068/0.151 | 0.050/0.135 | 0.060/0.135 | 0.000 / 0.000 / 0.000 | 132.471 / 132.471 / 132.471 |
+| crlf-normalized / payload-accounting-base-selected | 0.377/0.501 | 0.384/0.490 | 0.378/0.507 | 0.000 / 0.000 / 0.000 | 231.871 / 231.871 / 231.871 |
+| long-line / idle | 0.310/0.348 | 0.299/0.348 | 0.330/0.350 | 1.009 / 1.009 / 1.009 | 148.409 / 148.409 / 148.409 |
+| long-line / caret | 0.349/0.471 | 0.324/0.383 | 0.348/0.430 | 1.009 / 1.009 / 1.009 | 148.474 / 148.474 / 148.474 |
+| long-line / selection-change | 3.025/25.059 | 0.469/25.472 | 2.704/26.462 | 1.009 / 1.009 / 1.009 | 148.569 / 148.538 / 148.569 |
+| long-line / selection-idle-all | 0.357/0.409 | 26.276/27.871 | 0.429/0.509 | 1.009 / 134.811 / 1.009 | 248.443 / 148.602 / 248.443 |
+| long-line / edit | 1.129/1.265 | 1.101/1.306 | 1.126/1.461 | 4.009 / 4.009 / 4.009 | 232.485 / 232.485 / 232.485 |
+| long-line / edit-after-idle | 44.703/47.634 | 44.350/46.224 | 44.762/46.938 | 120.827 / 120.827 / 120.827 | 232.550 / 232.550 / 232.550 |
+| long-line / ime-preedit | 24.437/67.026 | 25.614/67.710 | 26.120/65.692 | 135.812 / 135.812 / 135.812 | 332.457 / 232.615 / 332.457 |
+| long-line / ime-repeat | 0.395/0.444 | 24.192/25.996 | 0.388/0.501 | 1.009 / 134.812 / 1.009 | 248.702 / 148.860 / 248.702 |
+| long-line / ime-commit | 3.265/3.562 | 1.352/1.765 | 3.360/3.920 | 4.009 / 4.009 / 4.009 | 232.743 / 232.743 / 232.743 |
+| long-line / ime-cancel | 2.706/3.174 | 0.795/0.908 | 2.767/2.958 | 2.009 / 2.009 / 2.009 | 232.805 / 232.805 / 232.805 |
+| long-line / ime-native-clear-commit | 3.276/3.587 | 1.308/1.595 | 3.324/4.154 | 4.009 / 4.009 / 4.009 | 232.872 / 232.872 / 232.872 |
+| long-line / text-copy-only | 0.282/0.326 | 0.267/0.292 | 0.249/0.296 | 1.000 / 1.000 / 1.000 | 148.088 / 148.088 / 148.088 |
+| long-line / egui-layout-cache-hit | 0.338/0.367 | 0.287/0.325 | 0.337/0.381 | 1.000 / 1.000 / 1.000 | 148.113 / 148.113 / 148.113 |
+| long-line / selection-mutate-first | 23.593/25.794 | 23.776/25.601 | 23.425/25.086 | 133.802 / 133.802 / 133.802 | 148.137 / 148.137 / 148.137 |
+| long-line / selection-mutate-all | 25.967/27.410 | 25.535/26.938 | 25.634/27.625 | 133.802 / 133.802 / 133.802 | 148.162 / 148.162 / 148.162 |
+| long-line / selection-drop-first | 1.970/2.195 | 1.968/2.138 | 1.976/2.085 | 0.000 / 0.000 / 0.000 | 148.186 / 148.186 / 148.186 |
+| long-line / selection-drop-all | 1.961/2.211 | 1.962/2.051 | 1.973/2.241 | 0.000 / 0.000 / 0.000 | 148.209 / 148.209 / 148.210 |
+| long-line / payload-accounting-base | 0.000/0.000 | 0.000/0.000 | 0.000/0.000 | 0.000 / 0.000 / 0.000 | 148.234 / 148.234 / 148.234 |
+| long-line / payload-accounting-base-selected | 0.001/0.002 | 0.001/0.002 | 0.001/0.002 | 0.000 / 0.000 / 0.000 | 248.100 / 248.100 / 248.100 |

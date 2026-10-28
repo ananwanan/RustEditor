@@ -1,0 +1,19 @@
+--- a/crates/editor-view/src/layout_cache.rs
++++ b/crates/editor-view/src/layout_cache.rs
+@@ -116,8 +116,14 @@
+         visuals::paint_text_selection(&mut galley, visuals, range, None);
+         if let Some(base) = &self.base
+             && let Some(epoch) = &self.font_epoch
+-            && retained_bytes([epoch.as_ref(), base.galley.as_ref(), galley.as_ref()])
+-                <= self.max_retained_bytes
++            && {
++                let combined =
++                    retained_bytes([epoch.as_ref(), base.galley.as_ref(), galley.as_ref()]);
++                combined <= self.max_retained_bytes
++                    && combined
++                        .saturating_sub(retained_bytes([epoch.as_ref(), base.galley.as_ref()]))
++                        <= 8 * 1024 * 1024
++            }
+         {
+             self.selected = Some(CachedSelection {
+                 range: *range,

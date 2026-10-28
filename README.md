@@ -2,7 +2,7 @@
 
 A Rust desktop text and code editor inspired by Notepad++. Features are separated into a Cargo workspace, with extensions provided through dynamically loaded libraries.
 
-Current status: **M0 prototype implemented; acceptance remains incomplete**. Windows checks at 125% scale provide partial native evidence, and release idle memory has been measured. Microsoft Pinyin, native 100%/150%/200% DPI, complete font/input coverage, and actual startup/input-to-present performance remain pending. The native desktop, independent editing core, C ABI/SDK, real dynamic plugin host, text-tools extension, and development tooling are runnable. See the [M0 acceptance record](docs/acceptance/M0.md) for exact results and reproduction steps. M1 must wait for the mandatory M0 gates.
+Current status (2026-10-29): **M0 prototype implemented; acceptance remains incomplete**. Windows checks at 125% scale provide partial observations, and release idle memory has been measured. Microsoft Pinyin, native 100%/150%/200% DPI, complete font/input coverage, and actual startup/input-to-present performance remain pending. The native desktop, independent editing core, C ABI/SDK, real dynamic plugin host, text-tools extension, and development tooling are runnable. See the [M0 acceptance record](docs/acceptance/M0.md) and [native acceptance follow-up](docs/acceptance/M0_NATIVE.md) for actual evidence, its limits and remaining steps. GUI selection remains provisional; M1 has not started and must wait for the mandatory M0 gates.
 
 - [Architecture, technology choices, and workspace](docs/ARCHITECTURE.md)
 - [Dynamic library plugin protocol](docs/PLUGIN_ABI.md)
@@ -36,6 +36,8 @@ cargo run --locked -p rusteditor-desktop -- --plugin-dir /absolute/trusted/plugi
 Use `--empty` to start an empty scratch buffer for GUI measurements. It cannot be combined with the headless `--smoke-test`, which uses a fixed test fixture. The [Windows performance protocol](tests/perf/README.md) provides a real-process memory harness and deterministic UTF-8 workloads. Window discovery timing is diagnostic; editable startup and input-to-present latency require separate presentation evidence.
 
 The protocol also provides headless render CPU/allocation diagnostics using the same Unicode fixtures. The view retains a bounded derived layout/selection cache (256 MiB accounted payload); this does not change document authority or establish large-file support. Internal timers and allocation counters do not satisfy the remaining displayed-frame performance gates.
+
+The 2026-10-29 review retains that cache policy after a measured restriction reduced retained payload but substantially increased repeated selection/preedit costs. The first full-text copy each frame and large painted-row retention/destruction remain documented costs. Final release empty-buffer working set was 148.8125 MiB p50 and 161.5234 MiB maximum, missing the `<150 MiB` budget in this run. The [follow-up record](docs/acceptance/M0_NATIVE.md) preserves the rejected trial, deallocation/accounting probes and earlier unfavorable measurements. Windows UI automation uses SendInput and supplies supplemental observations; mandatory physical native acceptance and correlated display measurements remain open.
 
 The experimental plugin SDK targets the current version. Older SDK compatibility is not required; rebuild plugins when the SDK/ABI changes. Version, table-size, capability, and lifecycle checks remain mandatory.
 
