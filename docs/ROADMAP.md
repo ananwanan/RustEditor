@@ -39,8 +39,7 @@ Each milestone must include implementation, necessary tests, build commands, act
 1. Run the Windows manual checklist for Chinese IME composition/candidate positioning, 100%/150%/200% DPI, clipboard, shortcuts, and scratch close confirmation. Fix failures before selecting the final GUI.
 2. Review grapheme movement/deletion in the provisional scalar-index TextEdit view, including combining marks and emoji sequences.
 3. Establish a frozen separately built SDK fixture and test it against a later host revision; current same-workspace fixtures prove loading/failure handling, not released-version compatibility.
-4. Record Windows CI results and retain a reproducible native DLL acceptance run. Linux shared-object checks do not establish Windows runtime behavior.
-5. Record GUI/ABI decisions and calibrate startup/input budgets on the specified Windows hardware before marking M0 complete or starting M1.
+4. Record GUI/ABI decisions and calibrate startup/input budgets on the specified Windows hardware before marking M0 complete or starting M1. Automated Ubuntu/Windows DLL/core checks already pass; the acceptance record links the actual run.
 
 ## Decisions Still Open
 

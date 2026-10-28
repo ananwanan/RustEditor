@@ -1,6 +1,6 @@
 # Dynamic Library Plugin Protocol Draft v1
 
-Status: **implemented experimental v1.0**, pending the remaining [M0 acceptance gates](acceptance/M0.md). The canonical Rust C-layout types and status values are in [plugin-api](../crates/plugin-api/src/lib.rs); the implemented Rust wrappers are in [plugin-sdk](../crates/plugin-sdk/src/lib.rs). Linux real-library checks pass; Windows/macOS behavior and older released-SDK compatibility are not inferred from that result. Rust plugins use `crate-type = ["cdylib"]`, distinct from Rust's `dylib` crate type.
+Status: **implemented experimental v1.0**, pending the remaining [M0 acceptance gates](acceptance/M0.md). The canonical Rust C-layout types and status values are in [plugin-api](../crates/plugin-api/src/lib.rs); the implemented Rust wrappers are in [plugin-sdk](../crates/plugin-sdk/src/lib.rs). Linux and Windows CI real-library checks pass; macOS and older released-SDK compatibility are unverified. Rust plugins use `crate-type = ["cdylib"]`, distinct from Rust's `dylib` crate type.
 
 ## Boundaries
 

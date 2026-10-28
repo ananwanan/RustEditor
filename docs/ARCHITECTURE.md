@@ -12,7 +12,7 @@ Date: 2026-10-28. The M0 prototype now implements the desktop/core/api/sdk/host/
 - libloading 0.8.9 loads real cdylibs at startup. Host/SDK meet through the implemented v1.0 C tables in plugin-api; the desktop does not link the plugin crate. Explicit plugin installations and manifests gate loading; Windows uses DLL-directory + System32 search flags, Unix uses RTLD_NOW | RTLD_LOCAL.
 - The M0 command registry lives in plugin-host. A standalone commands crate and editor-view crate will be extracted when M1 needs shared routing/view responsibilities; no empty placeholders were created.
 - Rust FFI boundaries convert unwindable panics to fixed status values. Unknown native state or failed shutdown retains the library, host table, and context until process exit. Disabling only removes dispatch; updates require restart.
-- Native GUI verification, older released-SDK compatibility, performance budgets, safe file saving, and platform release support are not established by the current automated tests.
+- Windows native GUI verification, older released-SDK compatibility, performance budgets, safe file saving, and platform release support are not established by the current automated tests. Ubuntu/Windows DLL/core CI and a Linux X11 window smoke pass; see the acceptance record for their exact scope and font limitations.
 
 ## Product Scope
 
