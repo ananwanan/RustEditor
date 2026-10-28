@@ -2,7 +2,7 @@
 
 A Rust desktop text and code editor inspired by Notepad++. Features are separated into a Cargo workspace, with extensions provided through dynamically loaded libraries.
 
-Current status: **M0 prototype implemented; Windows manual acceptance is pending**. The native desktop, independent editing core, C ABI/SDK, real dynamic plugin host, text-tools extension, and development tooling are runnable. See the [M0 acceptance record](docs/acceptance/M0.md) for measured results and remaining gates. M0 is not marked complete.
+Current status: **M0 prototype implemented; acceptance remains incomplete**. Windows checks at 125% scale provide partial native evidence, and release idle memory has been measured. Microsoft Pinyin, native 100%/150%/200% DPI, complete font/input coverage, and actual startup/input-to-present performance remain pending. The native desktop, independent editing core, C ABI/SDK, real dynamic plugin host, text-tools extension, and development tooling are runnable. See the [M0 acceptance record](docs/acceptance/M0.md) for exact results and reproduction steps. M1 must wait for the mandatory M0 gates.
 
 - [Architecture, technology choices, and workspace](docs/ARCHITECTURE.md)
 - [Dynamic library plugin protocol](docs/PLUGIN_ABI.md)
@@ -29,8 +29,11 @@ Chinese glyphs use an installed system font (Microsoft YaHei on Windows, Noto Sa
 
 ```sh
 cargo run --locked -p rusteditor-desktop -- --no-plugins
+cargo run --locked -p rusteditor-desktop -- --no-plugins --empty
 cargo run --locked -p rusteditor-desktop -- --plugin-dir /absolute/trusted/plugins
 ```
+
+Use `--empty` to start an empty scratch buffer for GUI measurements. It cannot be combined with the headless `--smoke-test`, which uses a fixed test fixture. The [Windows performance protocol](tests/perf/README.md) provides a real-process memory harness and deterministic UTF-8 workloads. Window discovery timing is diagnostic; editable startup and input-to-present latency require separate presentation evidence.
 
 The experimental plugin SDK targets the current version. Older SDK compatibility is not required; rebuild plugins when the SDK/ABI changes. Version, table-size, capability, and lifecycle checks remain mandatory.
 

@@ -25,6 +25,7 @@ struct Composition {
 /// View state contains no independently editable document or undo history.
 pub struct EditorView {
     composition: Option<Composition>,
+    ime_session_active: bool,
     ignore_ime_commit: bool,
     h_pos: Option<f32>,
     focus_requested: bool,
@@ -35,6 +36,7 @@ impl Default for EditorView {
     fn default() -> Self {
         Self {
             composition: None,
+            ime_session_active: false,
             ignore_ime_commit: false,
             h_pos: None,
             focus_requested: true,
@@ -49,6 +51,15 @@ pub struct ViewOutput {
 }
 
 impl EditorView {
+    fn cancel_composition(&mut self) {
+        // A platform may deliver a bare Commit without Enabled or Preedit.
+        // Ignore delayed commits only when an observed session was cancelled;
+        // ordinary focus changes must not disable that native input path.
+        self.ignore_ime_commit |= self.ime_session_active || self.composition.is_some();
+        self.ime_session_active = false;
+        self.composition = None;
+    }
+
     pub fn request_focus(&mut self) {
         self.focus_requested = true;
         self.h_pos = None;
@@ -61,7 +72,8 @@ impl EditorView {
     /// Suppress application commands throughout a composition frame, including
     /// its commit, so shortcuts cannot race the platform's IME events.
     pub fn blocks_shortcuts(&self, ctx: &egui::Context) -> bool {
-        self.is_composing()
+        self.ime_session_active
+            || self.is_composing()
             || ctx.input(|i| {
                 i.events.iter().any(|e| {
                     matches!(
@@ -80,8 +92,7 @@ impl EditorView {
             .as_ref()
             .is_some_and(|c| c.document_id != document.id() || c.revision != document.revision())
         {
-            self.composition = None;
-            self.ignore_ime_commit = true;
+            self.cancel_composition();
         }
         normalize(document);
         let font = FontId::monospace(16.0);
@@ -102,9 +113,10 @@ impl EditorView {
         if ui.is_enabled()
             && let Some(pointer) = response.interact_pointer_pos()
         {
-            if self.composition.is_some() && ui.input(|i| i.pointer.any_pressed()) {
-                self.composition = None;
-                self.ignore_ime_commit = true;
+            if (self.ime_session_active || self.composition.is_some())
+                && ui.input(|i| i.pointer.any_pressed())
+            {
+                self.cancel_composition();
                 galley = self.layout(ui.ctx(), document, &font, color);
             }
             if !self.is_composing() {
@@ -147,9 +159,24 @@ impl EditorView {
         let focused = response.has_focus() && ui.is_enabled() && ui.input(|i| i.focused);
         if focused {
             ui.memory_mut(|m| m.set_focus_lock_filter(id, filter));
-            let events = ui.input(|i| i.filtered_events(&filter));
-            let mut ime_owns_input = self.is_composing();
-            for event in events {
+            let mut events = ui
+                .input(|i| i.filtered_events(&filter))
+                .into_iter()
+                .peekable();
+            let mut ime_owns_input = self.ime_session_active || self.is_composing();
+            while let Some(event) = events.next() {
+                // Windows clears preedit immediately before delivering its
+                // result. egui-winit maps that clear to Disabled, so an adjacent
+                // Disabled/Commit pair is a commit boundary, not cancellation.
+                // Keep the original composition range until Commit consumes it.
+                if matches!(event, egui::Event::Ime(egui::ImeEvent::Disabled))
+                    && matches!(
+                        events.peek(),
+                        Some(egui::Event::Ime(egui::ImeEvent::Commit(_)))
+                    )
+                {
+                    continue;
+                }
                 match event {
                     egui::Event::Ime(egui::ImeEvent::Disabled) => ime_owns_input = false,
                     egui::Event::Ime(_) => ime_owns_input = true,
@@ -182,7 +209,7 @@ impl EditorView {
                 galley = self.layout(ui.ctx(), document, &font, color);
             }
         } else {
-            self.ignore_ime_commit |= self.composition.take().is_some();
+            self.cancel_composition();
             galley = self.layout(ui.ctx(), document, &font, color);
         }
 
@@ -211,7 +238,11 @@ impl EditorView {
                 .unwrap_or_default();
             ui.output_mut(|o| {
                 o.ime = Some(egui::output::IMEOutput {
-                    rect: transform * rect,
+                    // egui-winit 0.33 uses rect for set_ime_cursor_area. On
+                    // Windows this excludes the supplied area from candidates,
+                    // so the full document rect would anchor them far below the
+                    // caret. Supply the caret line as the native exclusion area.
+                    rect: transform * caret,
                     cursor_rect: transform * caret,
                 });
                 o.mutable_text_under_cursor = response.hovered();

@@ -17,12 +17,14 @@ impl EditorView {
         if let Event::Ime(ime) = event {
             match ime {
                 ImeEvent::Enabled => {
+                    self.ime_session_active = true;
                     self.ignore_ime_commit = false;
                 }
                 ImeEvent::Preedit(text) => {
                     if text == "\r" || text == "\n" {
                         return Ok(false);
                     }
+                    self.ime_session_active = true;
                     if !text.is_empty() {
                         self.ignore_ime_commit = false;
                     }
@@ -42,6 +44,7 @@ impl EditorView {
                     }
                 }
                 ImeEvent::Commit(text) => {
+                    self.ime_session_active = false;
                     if self.ignore_ime_commit {
                         return Ok(false);
                     }
@@ -59,7 +62,7 @@ impl EditorView {
                     }
                 }
                 ImeEvent::Disabled => {
-                    self.ignore_ime_commit |= self.composition.take().is_some();
+                    self.cancel_composition();
                 }
             }
             self.h_pos = None;
@@ -74,7 +77,7 @@ impl EditorView {
                     ..
                 }
         ) {
-            self.ignore_ime_commit |= self.composition.take().is_some();
+            self.cancel_composition();
             return Ok(true);
         }
         if self.is_composing() {

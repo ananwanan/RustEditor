@@ -1,6 +1,6 @@
 # Development Roadmap and Acceptance Criteria
 
-M0 implementation is in progress: the workspace, bounded editing core, native desktop prototype, real plugin loading, SDK, text-tools, xtask, and automated failure tests exist. See the [acceptance record](acceptance/M0.md). Windows manual input/DPI/font acceptance remains open; older SDK compatibility is not required; M0 is not complete. M1–M6 remain pending. Dependencies are locked for reproducible builds, while the GUI and ABI remain provisional. Estimates below are rough figures for one full-time developer, not delivery commitments.
+M0 implementation is available; **acceptance remains incomplete**. The workspace, bounded editing core, native desktop prototype, real plugin loading, SDK, text-tools, xtask, and automated failure tests exist. See the [acceptance record](acceptance/M0.md). Native Windows checks at 125% scale provide partial Sogou IME, clipboard, plugin, no-plugin, and close-confirmation evidence. Microsoft Pinyin, the required native 100%/150%/200% DPI cases, and displayed-frame performance gates remain Pending. Older SDK compatibility is not required. M1 remains blocked until mandatory M0 acceptance passes; M1–M6 have not started. Dependencies are locked for reproducible builds, while the GUI and ABI remain provisional. Estimates below are rough figures for one full-time developer, not delivery commitments.
 
 | Milestone | Estimate | Deliverables and completion criteria |
 |---|---|---|
@@ -28,6 +28,8 @@ Use a recorded Windows 11 x64 test machine with at least four CPU cores, 16GB RA
 
 Measure end-to-end latency from input events to frame presentation. Core operation timing alone does not represent the user experience. Record Chinese, emoji, CRLF, GBK, UTF-16, long-line, and repeated-replacement workloads separately. If a budget is missed, record the cause and fallback behavior rather than silently changing acceptance criteria.
 
+Use the [M0 Windows performance protocol](../tests/perf/README.md) for reproducible empty-buffer memory sampling, warm/cold startup capture, and a precisely sized 1 MiB Unicode workload. The harness runs the built GUI with `--no-plugins --empty` and retains raw process memory and launch-to-window observations. Window discovery is not editable-state startup or frame presentation and must not be compared with the startup budget. Actual warm/cold editable-frame startup and input-to-present latency remain Pending until correlated display evidence is recorded. The [acceptance record](acceptance/M0.md) owns actual measurements and hardware qualifications. M0 still has no file opening, GBK/UTF-16 decoding, or 10/100 MiB modes; those scenarios remain later milestone work.
+
 ## Validation Strategy
 
 Core: edit/undo/redo invariants, randomized edits compared with a simple reference model, and Unicode boundaries. File I/O: encoding round trips, unencodable characters, external changes, and preservation of originals after write failures. Search: cross-rope-chunk matches, zero-length matches, replace-all, and cancellation. Syntax: revision races. Plugins: real dynamic library loading and subprocess failure tests. UI: manual Windows IME, DPI, shortcut conflict, tab closing, clipboard, and recovery records, followed by platform-specific expansion.
@@ -36,10 +38,10 @@ Each milestone must include implementation, necessary tests, build commands, act
 
 ## Remaining M0 Tasks
 
-1. Run the Windows manual checklist for Chinese IME composition/candidate positioning, 100%/150%/200% DPI, clipboard, shortcuts, and scratch close confirmation. Fix failures before selecting the final GUI.
-2. Validate the core-driven grapheme view on Windows, including combining marks, emoji/flag/ZWJ sequences, CRLF, word/vertical navigation, and the installed font set. Automated boundary, input-order, clipboard, and synthetic IME regressions are implemented.
+1. Complete the Windows manual checklist with Microsoft Pinyin composition/candidate positioning and native 100%/150%/200% DPI, including scrolling, window movement, and monitor transitions. An attempted Settings launch exposed no controllable window in this session; these cases remain Pending. Preserve the narrower 125% Sogou, clipboard, plugin/no-plugin, and close-confirmation observations in the acceptance record.
+2. Complete Windows grapheme/font validation for combining marks, emoji/flag/ZWJ sequences, CRLF, word/vertical navigation, and pointer hits. Automated boundary, input-order, clipboard, and synthetic IME regressions exist. Validation fixes cover the scrolled candidate rectangle, cancellation/session tracking against late commits, and Windows clear-before-commit ordering; they do not replace the remaining native checks.
 3. Target the current experimental SDK/ABI. Older SDK compatibility and frozen historical SDK fixtures are explicitly out of scope; keep version/size/capability validation and real-library failure tests.
-4. Record GUI/ABI decisions and calibrate startup/input budgets on the specified Windows hardware before marking M0 complete or starting M1. Automated Ubuntu/Windows DLL/core checks already pass; the acceptance record links the actual run.
+4. Retain eframe/egui 0.33.3 provisionally and finish the GUI decision using the remaining native and displayed-frame evidence. Apply the performance protocol on the specified Windows hardware; publish actual startup/input results and any missed budgets before marking M0 complete or starting M1. Automated Ubuntu/Windows DLL/core checks already pass; the acceptance record links their exact scope. Preserve current dependency, transaction, revision, and ABI safety boundaries without adding historical compatibility or hot unloading.
 
 ## Decisions Still Open
 

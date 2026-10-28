@@ -23,3 +23,5 @@ jobs:
         run: rustup toolchain install 1.88.0 --profile minimal --component rustfmt,clippy
       - name: Verify formatting, lints, real plugins and no-plugin startup
         run: cargo xtask verify
+      - name: Verify reproducible GUI workload fixtures
+        run: python -B -m unittest discover -s tests/perf -p "test_*.py"

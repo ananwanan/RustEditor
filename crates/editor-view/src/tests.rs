@@ -9,6 +9,8 @@ struct Harness {
     document: Document,
     time: f64,
     error: Option<String>,
+    scroll_offset: Option<egui::Vec2>,
+    focused: bool,
 }
 
 impl Harness {
@@ -19,6 +21,8 @@ impl Harness {
             document: Document::new(DocumentId(1), text).unwrap(),
             time: 0.0,
             error: None,
+            scroll_offset: None,
+            focused: true,
         };
         harness.frame(Vec::new());
         harness
@@ -33,21 +37,23 @@ impl Harness {
                     egui::Pos2::ZERO,
                     egui::vec2(900.0, 600.0),
                 )),
-                focused: true,
+                focused: self.focused,
                 time: Some(self.time),
                 events,
                 ..Default::default()
             },
             |ctx| {
                 egui::CentralPanel::default().show(ctx, |ui| {
-                    egui::ScrollArea::both()
-                        .auto_shrink([false, false])
-                        .show(ui, |ui| {
-                            let output =
-                                self.view
-                                    .show(ui, Id::new("test-editor"), &mut self.document);
-                            self.error = output.error;
-                        });
+                    let mut scroll = egui::ScrollArea::both().auto_shrink([false, false]);
+                    if let Some(offset) = self.scroll_offset {
+                        scroll = scroll.scroll_offset(offset);
+                    }
+                    scroll.show(ui, |ui| {
+                        let output = self
+                            .view
+                            .show(ui, Id::new("test-editor"), &mut self.document);
+                        self.error = output.error;
+                    });
                 });
             },
         )
@@ -241,7 +247,8 @@ fn cancelled_or_stale_ime_never_deletes_original_text_or_replays_a_late_commit()
             .set_selection(Selection { anchor: 0, head: 3 })
             .unwrap();
         h.frame(vec![ime(ImeEvent::Preedit("ni".into()))]);
-        h.frame(vec![cancellation, ime(ImeEvent::Commit("你".into()))]);
+        h.frame(vec![cancellation]);
+        h.frame(vec![ime(ImeEvent::Commit("你".into()))]);
         assert_eq!(h.document.text(), "原文");
         assert!(!h.document.can_undo());
     }
@@ -276,6 +283,141 @@ fn empty_preedit_and_focus_loss_preserve_core_text() {
 }
 
 #[test]
+fn cancelling_before_nonempty_preedit_rejects_late_commits() {
+    for cancellation in [
+        key(Key::Escape),
+        Event::WindowFocused(false),
+        ime(ImeEvent::Disabled),
+    ] {
+        let mut h = Harness::new("原文");
+        let selection = Selection { anchor: 3, head: 0 };
+        h.document.set_selection(selection).unwrap();
+        h.frame(vec![
+            ime(ImeEvent::Enabled),
+            ime(ImeEvent::Preedit(String::new())),
+        ]);
+        h.frame(vec![cancellation]);
+        h.view.request_focus();
+        h.frame(vec![ime(ImeEvent::Commit("你".into()))]);
+        assert_eq!(h.document.text(), "原文");
+        assert_eq!(h.document.selection(), selection);
+        assert_eq!(h.document.revision(), Revision(1));
+        assert!(!h.document.can_undo());
+
+        // A new platform session may commit directly without a visible preedit.
+        h.view.request_focus();
+        h.frame(vec![
+            ime(ImeEvent::Enabled),
+            ime(ImeEvent::Commit("好".into())),
+        ]);
+        assert_eq!(h.document.text(), "好文");
+        assert_eq!(h.document.revision(), Revision(2));
+        h.frame(vec![key_with(Key::Z, Modifiers::COMMAND)]);
+        assert_eq!(h.document.text(), "原文");
+        assert_eq!(h.document.selection(), selection);
+    }
+}
+
+#[test]
+fn bare_ime_commits_work_after_unfocused_frames_and_normal_focus_changes() {
+    let mut h = Harness::new("原文");
+    h.focused = false;
+    h.frame(vec![]);
+    h.focused = true;
+    h.view.request_focus();
+    h.frame(vec![ime(ImeEvent::Commit("你".into()))]);
+    assert_eq!(h.document.text(), "你原文");
+    assert_eq!(h.document.revision(), Revision(2));
+
+    // Disabled follows a successful native commit; it is not cancellation.
+    h.frame(vec![ime(ImeEvent::Disabled)]);
+    h.frame(vec![Event::WindowFocused(false)]);
+    h.view.request_focus();
+    h.frame(vec![ime(ImeEvent::Commit("好".into()))]);
+    assert_eq!(h.document.text(), "你好原文");
+    assert_eq!(h.document.revision(), Revision(3));
+}
+
+#[test]
+fn native_preedit_clear_before_commit_preserves_the_composition_range() {
+    for preedit in [false, true] {
+        let mut h = Harness::new("原文");
+        h.document
+            .set_selection(Selection { anchor: 3, head: 0 })
+            .unwrap();
+        if preedit {
+            h.frame(vec![ime(ImeEvent::Preedit("ni".into()))]);
+            // Selection changes do not invalidate the original preedit range.
+            h.document
+                .set_selection(Selection { anchor: 3, head: 6 })
+                .unwrap();
+        }
+        h.frame(vec![
+            ime(ImeEvent::Disabled),
+            ime(ImeEvent::Commit("你".into())),
+            ime(ImeEvent::Disabled),
+        ]);
+        assert_eq!(h.document.text(), "你文");
+        assert_eq!(h.document.revision(), Revision(2));
+        assert!(!h.view.is_composing());
+        assert!(!h.view.ime_session_active);
+        h.frame(vec![key_with(Key::Z, Modifiers::COMMAND)]);
+        assert_eq!(h.document.text(), "原文");
+        assert!(!h.document.can_undo());
+    }
+}
+
+#[test]
+fn native_preedit_clear_does_not_revive_a_cancelled_session() {
+    let mut h = Harness::new("原文");
+    h.frame(vec![ime(ImeEvent::Preedit("ni".into()))]);
+    h.frame(vec![Event::WindowFocused(false)]);
+    h.frame(vec![
+        ime(ImeEvent::Disabled),
+        ime(ImeEvent::Commit("你".into())),
+        ime(ImeEvent::Disabled),
+    ]);
+    assert_eq!(h.document.text(), "原文");
+    assert_eq!(h.document.revision(), Revision(1));
+    assert!(!h.document.can_undo());
+}
+
+#[test]
+fn pointer_cancels_an_observed_session_before_nonempty_preedit() {
+    let mut h = Harness::new("原文");
+    let output = h.frame(vec![
+        ime(ImeEvent::Enabled),
+        ime(ImeEvent::Preedit(String::new())),
+    ]);
+    assert!(h.view.ime_session_active);
+    let caret = output.platform_output.ime.unwrap().cursor_rect;
+    let pos = egui::pos2(caret.min.x + 120.0, caret.center().y);
+    h.frame(vec![
+        Event::PointerMoved(pos),
+        Event::PointerButton {
+            pos,
+            button: egui::PointerButton::Primary,
+            pressed: true,
+            modifiers: Modifiers::NONE,
+        },
+    ]);
+    assert_eq!(h.document.selection().head, h.document.text().len());
+    h.frame(vec![
+        Event::PointerButton {
+            pos,
+            button: egui::PointerButton::Primary,
+            pressed: false,
+            modifiers: Modifiers::NONE,
+        },
+        ime(ImeEvent::Commit("你".into())),
+    ]);
+    assert_eq!(h.document.text(), "原文");
+    assert_eq!(h.document.revision(), Revision(1));
+    assert!(!h.document.can_undo());
+    assert!(!h.view.ime_session_active);
+}
+
+#[test]
 fn ordinary_text_surrounding_an_ime_session_in_one_frame_is_not_lost() {
     let mut h = Harness::new("");
     h.frame(vec![
@@ -297,13 +439,13 @@ fn ordinary_text_surrounding_an_ime_session_in_one_frame_is_not_lost() {
 fn pointer_hit_testing_snaps_to_a_grapheme_boundary() {
     let mut h = Harness::new("👩🏽‍💻e\u{301}尾");
     let output = h.frame(vec![]);
-    let rect = output.platform_output.ime.unwrap().rect;
+    let caret = output.platform_output.ime.unwrap().cursor_rect;
     // Probe many x positions through the compound glyph sequence. All clicks
     // must land on one of the extended cluster boundaries, including drag start.
     let mut heads = std::collections::BTreeSet::new();
     for x in (2..150).step_by(3) {
         h.time += 0.6;
-        let position = rect.min + egui::vec2(x as f32, 14.0);
+        let position = egui::pos2(caret.min.x + x as f32, caret.center().y);
         h.frame(vec![
             Event::PointerMoved(position),
             Event::PointerButton {
@@ -416,6 +558,27 @@ fn caret_and_hit_testing_use_logical_coordinates_at_multiple_scales() {
             },
         ]);
         assert_eq!(h.document.selection().head, "Ae\u{301}".len());
+    }
+}
+
+#[test]
+fn native_ime_area_tracks_the_caret_after_scrolling_at_multiple_scales() {
+    let line = format!("{}中e\u{301}\n", "abcdef".repeat(30));
+    for scale in [1.0, 1.5, 2.0] {
+        let mut h = Harness::new(&line.repeat(80));
+        h.ctx.set_pixels_per_point(scale);
+        h.caret(20 * line.len() + 60);
+        let before = h.frame(vec![]).platform_output.ime.unwrap();
+        assert_eq!(before.rect, before.cursor_rect);
+        assert!(before.rect.height() < 40.0);
+
+        h.scroll_offset = Some(egui::vec2(48.0, 128.0));
+        let after = h.frame(vec![]).platform_output.ime.unwrap();
+        assert_eq!(after.rect, after.cursor_rect);
+        let movement = before.rect.min - after.rect.min;
+        assert!((movement.x - 48.0).abs() < 0.1, "{movement:?}");
+        assert!((movement.y - 128.0).abs() < 0.1, "{movement:?}");
+        assert!(after.rect.is_finite());
     }
 }
 
