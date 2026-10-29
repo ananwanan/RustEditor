@@ -1,3 +1,4 @@
+
 name: M0 validation
 
 on:
@@ -14,14 +15,24 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-24.04, windows-2022]
+
     runs-on: ${{ matrix.os }}
     timeout-minutes: 25
+
     steps:
       - uses: actions/checkout@v4
-      - name: Install the pinned Rust toolchain
+
+      - name: Install latest stable Rust toolchain
         shell: bash
-        run: rustup toolchain install 1.88.0 --profile minimal --component rustfmt,clippy
+        run: |
+          rustup update stable
+          rustup toolchain install stable --profile minimal --component rustfmt,clippy
+          rustup show active-toolchain
+          rustc --version
+          cargo --version
+
       - name: Verify formatting, lints, real plugins and no-plugin startup
         run: cargo xtask verify
+
       - name: Verify reproducible GUI workload fixtures
         run: python -B -m unittest discover -s tests/perf -p "test_*.py"

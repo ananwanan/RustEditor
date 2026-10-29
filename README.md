@@ -1,6 +1,6 @@
 # RustEditor
 
-A Rust desktop text and code editor inspired by Notepad++. Features are separated into a Cargo workspace, with extensions provided through dynamically loaded libraries.
+A Rust desktop text and code editor. Features are separated into a Cargo workspace, with extensions provided through dynamically loaded libraries.
 
 Current status: **M0 prototype implemented; acceptance remains incomplete**. Windows checks at 125% scale provide partial native evidence, and release idle memory has been measured. Microsoft Pinyin, native 100%/150%/200% DPI, complete font/input coverage, and actual startup/input-to-present performance remain pending. The native desktop, independent editing core, C ABI/SDK, real dynamic plugin host, text-tools extension, and development tooling are runnable. See the [M0 acceptance record](docs/acceptance/M0.md) for exact results and reproduction steps. M1 must wait for the mandatory M0 gates.
 
@@ -12,7 +12,16 @@ Initial target: Windows 10/11 x64, followed by Linux and macOS. The application 
 
 ## Run the M0 preview
 
-Install Rust using [rustup](https://rustup.rs/); `rust-toolchain.toml` selects Rust 1.88.0, rustfmt, and clippy. Use the x64 MSVC toolchain and Visual Studio C++ build tools on Windows.
+Install Rust using [rustup](https://rustup.rs/). The project follows the **Rust stable channel** rather than pinning a specific compiler version. Use the following `rust-toolchain.toml` configuration to select stable Rust with rustfmt and clippy:
+
+```toml
+[toolchain]
+channel = "stable"
+profile = "minimal"
+components = ["rustfmt", "clippy"]
+```
+
+Run `rustup update stable` to update the installed stable toolchain. On Windows, use the x64 MSVC toolchain and Visual Studio C++ build tools.
 
 From the repository root:
 
