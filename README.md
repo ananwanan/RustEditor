@@ -2,7 +2,9 @@
 
 A Rust desktop text and code editor. Features are separated into a Cargo workspace, with extensions provided through dynamically loaded libraries.
 
-Current status: **M0 prototype implemented; acceptance remains incomplete**. Windows checks at 125% scale provide partial native evidence, and release idle memory has been measured. Microsoft Pinyin, native 100%/150%/200% DPI, complete font/input coverage, and actual startup/input-to-present performance remain pending. The native desktop, independent editing core, C ABI/SDK, real dynamic plugin host, text-tools extension, and development tooling are runnable. See the [M0 acceptance record](docs/acceptance/M0.md) for exact results and reproduction steps. M1 must wait for the mandatory M0 gates.
+Current status: **M0 prototype implemented; acceptance remains incomplete**. The native desktop, editing core, C ABI/SDK, dynamic plugin host, text-tools extension, and development tooling are runnable. Existing Windows 125% evidence covers Sogou, plugin/no-plugin behavior, some Unicode and clipboard operations, and close confirmation; Microsoft Pinyin, native 100%/150%/200% DPI, full input/font coverage, and presented-frame performance remain unverified.
+
+The maintainer reported completing M0 testing on 2026-11-02, but the merged [M0 acceptance follow-up (PR #4)](https://github.com/ananwanan/RustEditor/pull/4) contains a Clippy fix and a rustfmt configuration, not new native test artifacts. Its [main CI run](https://github.com/ananwanan/RustEditor/actions/runs/41475951813) passed on Ubuntu but failed Windows formatting validation (newline styles). The [M0 acceptance record](docs/acceptance/M0.md#2026-11-02-follow-up-evidence-audit) explains the evidence needed before marking M0 complete. M1 remains blocked by the mandatory M0 gates.
 
 - [Architecture, technology choices, and workspace](docs/ARCHITECTURE.md)
 - [Dynamic library plugin protocol](docs/PLUGIN_ABI.md)
