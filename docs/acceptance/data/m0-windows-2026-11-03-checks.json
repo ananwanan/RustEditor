@@ -1,0 +1,357 @@
+{
+  "schema_version": 1,
+  "record_date_local": "2026-11-03",
+  "timezone": "Asia/Shanghai",
+  "workspace": "D:\\code\\RustEditor",
+  "local_checks_revision": "34f4747bce52d0c3e046c4cf05afa001edcc70fa",
+  "gui_and_release_revision": "c65c2713a5c6a8c2cf0533ac3182befa8777d12d",
+  "intervening_changes_only": [
+    "README.md",
+    "docs/ROADMAP.md",
+    "docs/acceptance/M0.md"
+  ],
+  "production_or_dependency_changes_for_this_record": false,
+  "toolchain": {
+    "rustc": [
+      "rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+      "binary: rustc",
+      "commit-hash: 58cf8f9c35b355199727627d07ae34a4e2846d67",
+      "commit-date: 2026-10-13",
+      "host: x86_64-pc-windows-msvc",
+      "release: 1.99.1",
+      "LLVM version: 23.1.1"
+    ],
+    "cargo": "cargo 1.99.1 (5f94df478 2026-08-27)"
+  },
+  "commands": [
+    {
+      "command": "cargo xtask --help",
+      "exit_code": 0,
+      "result": "Supported subcommands stage, verify"
+    },
+    {
+      "command": "cargo xtask verify",
+      "exit_code": 0,
+      "rust_tests_passed": 42,
+      "test_groups": {
+        "desktop": 1,
+        "core": 5,
+        "view": 22,
+        "api": 1,
+        "host_callbacks": 3,
+        "native_library_integration": 8,
+        "sdk": 2
+      },
+      "checks": [
+        "cargo fmt --all -- --check",
+        "cargo clippy --workspace --all-targets --locked -- -D warnings",
+        "cargo test --workspace --locked",
+        "real cdylib build/stage and smoke test",
+        "no-plugin smoke test"
+      ],
+      "raw_output": "m0-windows-2026-11-03-verify.txt"
+    },
+    {
+      "command": "python -B -m unittest discover -s tests/perf -p 'test_*.py'",
+      "exit_code": 0,
+      "tests_passed": 4
+    },
+    {
+      "command": "cargo build --release --locked -p rusteditor-desktop",
+      "exit_code": 0
+    },
+    {
+      "command": "powershell -NoProfile -File tests/perf/windows_gui.ps1 -Binary target/release/rusteditor-desktop.exe -Output target/m0-perf/windows-2026-11-03.json -DisplayScalePercent 125 -Samples 5 -EnvironmentNote <conditions retained in raw report>",
+      "exit_code": 0,
+      "raw_output": "m0-windows-2026-11-03.json"
+    }
+  ],
+  "artifacts": [
+    {
+      "name": "desktop-debug",
+      "path": "target/debug/rusteditor-desktop.exe",
+      "build": "debug",
+      "sha256": "f7f6565858432d5387e352a9b1dbf432c2fc6932041fde0cfd8dca92c306736f"
+    },
+    {
+      "name": "text-tools-staged",
+      "path": "target/debug/plugins/text-tools/rusteditor_text_tools.dll",
+      "build": "debug cdylib",
+      "sha256": "b2f83f134a849d48200d5efc151adaabb1ec1037b7809c811e10c2994d797086"
+    },
+    {
+      "name": "desktop-release",
+      "path": "target/release/rusteditor-desktop.exe",
+      "build": "optimized release, workspace thin LTO",
+      "sha256": "b6e65875419c60b1e309b5a8afb5a7660bf2ef7e909d4c909e83ab6fb7e7c1c3"
+    }
+  ],
+  "fonts": [
+    {
+      "path": "C:/Windows/Fonts/msyh.ttc",
+      "sha256": "d79c55e68b1131eea0cc1c47be4f572d964f28c682e143db2ad09c1e4cb07a3f"
+    },
+    {
+      "path": "C:/Windows/Fonts/seguiemj.ttf",
+      "sha256": "451df9bb5546055af625ff86aa72695df43e8e170b4c6c1316fe44e9c7a22f7c"
+    }
+  ],
+  "native_window_checks": {
+    "method": "Computer Use SendInput and window capture; no physical-key or presentation timing claim",
+    "display_scale_percent_editor_reported": 125,
+    "plugins_loaded": 1,
+    "notepad_version": "11.2607.14.0",
+    "original_fixture_lf": "hello 你好 straße🙂 é 👩🏽‍💻 🇨🇳 1️⃣\n第二行 🧪",
+    "uppercase_fixture_lf": "HELLO 你好 STRASSE🙂 É 👩🏽‍💻 🇨🇳 1️⃣\n第二行 🧪",
+    "clipboard_sentinel_reset_before_each_assertion": true,
+    "clipboard_assertions": [
+      {
+        "check": "original LF copy",
+        "passed": true,
+        "utf8_bytes": 76,
+        "sha256": "48d29d5ece883e4f23a258ead71ec90f76a7b0ee5ca21813360ce20b2d11a77e"
+      },
+      {
+        "check": "uppercase LF copy",
+        "passed": true,
+        "utf8_bytes": 76,
+        "sha256": "c9e07f337529c5f92f8b33247bfcb5f15e65a8e4f793f7679957c97e66c83197"
+      },
+      {
+        "check": "undo LF copy",
+        "passed": true,
+        "utf8_bytes": 76,
+        "sha256": "48d29d5ece883e4f23a258ead71ec90f76a7b0ee5ca21813360ce20b2d11a77e"
+      },
+      {
+        "check": "Ctrl+Shift+Z redo LF copy",
+        "passed": true,
+        "utf8_bytes": 76,
+        "sha256": "c9e07f337529c5f92f8b33247bfcb5f15e65a8e4f793f7679957c97e66c83197"
+      },
+      {
+        "check": "Notepad CRLF copy",
+        "passed": true,
+        "utf8_bytes": 77,
+        "sha256": "e5acee7eb1ec0b1f0e92cee937d12a8c5db5087d030debfb8a27b95928d48339"
+      },
+      {
+        "check": "RustEditor-Notepad-RustEditor roundtrip LF copy",
+        "passed": true,
+        "utf8_bytes": 76,
+        "sha256": "c9e07f337529c5f92f8b33247bfcb5f15e65a8e4f793f7679957c97e66c83197"
+      },
+      {
+        "check": "multiline cut LF copy",
+        "passed": true,
+        "utf8_bytes": 76,
+        "sha256": "c9e07f337529c5f92f8b33247bfcb5f15e65a8e4f793f7679957c97e66c83197"
+      }
+    ],
+    "observed_revisions": {
+      "paste": 2,
+      "uppercase": 3,
+      "undo": 4,
+      "shift_z_redo": 5,
+      "identical_normalized_roundtrip": 5,
+      "cut": 6,
+      "paste_after_cut": 7
+    },
+    "close_observations": [
+      "Alt+F4 prompted",
+      "Keep editing preserved visible text, 76-byte count and revision 7",
+      "Titlebar close prompted",
+      "Discard and close exited; no editor process remained"
+    ],
+    "cleanup": "Task editor and temporary Notepad tab closed; pre-existing Notepad tabs not edited",
+    "font_observation": "CJK/combining text visible; some emoji components/placeholders remain"
+  },
+  "maintainer_signoff": {
+    "date_local": "2026-11-03",
+    "kind": "Explicit maintainer attestation and acceptance instruction in this conversation",
+    "statement_english": "Tests were performed, but the records were not saved; mark them passed.",
+    "question_scope": [
+      "Microsoft Pinyin",
+      "native 100/150/200 percent scaling",
+      "input-to-present latency"
+    ],
+    "original_test_dates": null,
+    "original_source_and_binaries": null,
+    "original_machine_and_ime_details": null,
+    "original_measurements": null,
+    "raw_records_retained": false,
+    "independently_reproduced_in_this_session": false
+  },
+  "ci": [
+    {
+      "run_id": 41481070293,
+      "source_sha": "34f4747bce52d0c3e046c4cf05afa001edcc70fa",
+      "url": "https://github.com/ananwanan/RustEditor/actions/runs/41481070293",
+      "event": "push",
+      "created_at_utc": "2026-11-02T16:23:57Z",
+      "conclusion": "success",
+      "jobs": [
+        {
+          "id": 125399194317,
+          "name": "check (ubuntu-24.04)",
+          "conclusion": "success",
+          "steps": [
+            {
+              "name": "Set up job",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run actions/checkout@v4",
+              "conclusion": "success"
+            },
+            {
+              "name": "Install latest stable Rust toolchain",
+              "conclusion": "success"
+            },
+            {
+              "name": "Verify formatting, lints, real plugins and no-plugin startup",
+              "conclusion": "success"
+            },
+            {
+              "name": "Verify reproducible GUI workload fixtures",
+              "conclusion": "success"
+            },
+            {
+              "name": "Post Run actions/checkout@v4",
+              "conclusion": "success"
+            },
+            {
+              "name": "Complete job",
+              "conclusion": "success"
+            }
+          ]
+        },
+        {
+          "id": 125399194552,
+          "name": "check (windows-2022)",
+          "conclusion": "success",
+          "steps": [
+            {
+              "name": "Set up job",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run actions/checkout@v4",
+              "conclusion": "success"
+            },
+            {
+              "name": "Install latest stable Rust toolchain",
+              "conclusion": "success"
+            },
+            {
+              "name": "Verify formatting, lints, real plugins and no-plugin startup",
+              "conclusion": "success"
+            },
+            {
+              "name": "Verify reproducible GUI workload fixtures",
+              "conclusion": "success"
+            },
+            {
+              "name": "Post Run actions/checkout@v4",
+              "conclusion": "success"
+            },
+            {
+              "name": "Complete job",
+              "conclusion": "success"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "run_id": 41481683607,
+      "source_sha": "c65c2713a5c6a8c2cf0533ac3182befa8777d12d",
+      "url": "https://github.com/ananwanan/RustEditor/actions/runs/41481683607",
+      "event": "push",
+      "created_at_utc": "2026-11-02T16:27:40Z",
+      "conclusion": "success",
+      "jobs": [
+        {
+          "id": 125401338652,
+          "name": "check (ubuntu-24.04)",
+          "conclusion": "success",
+          "steps": [
+            {
+              "name": "Set up job",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run actions/checkout@v4",
+              "conclusion": "success"
+            },
+            {
+              "name": "Install latest stable Rust toolchain",
+              "conclusion": "success"
+            },
+            {
+              "name": "Verify formatting, lints, real plugins and no-plugin startup",
+              "conclusion": "success"
+            },
+            {
+              "name": "Verify reproducible GUI workload fixtures",
+              "conclusion": "success"
+            },
+            {
+              "name": "Post Run actions/checkout@v4",
+              "conclusion": "success"
+            },
+            {
+              "name": "Complete job",
+              "conclusion": "success"
+            }
+          ]
+        },
+        {
+          "id": 125401339138,
+          "name": "check (windows-2022)",
+          "conclusion": "success",
+          "steps": [
+            {
+              "name": "Set up job",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run actions/checkout@v4",
+              "conclusion": "success"
+            },
+            {
+              "name": "Install latest stable Rust toolchain",
+              "conclusion": "success"
+            },
+            {
+              "name": "Verify formatting, lints, real plugins and no-plugin startup",
+              "conclusion": "success"
+            },
+            {
+              "name": "Verify reproducible GUI workload fixtures",
+              "conclusion": "success"
+            },
+            {
+              "name": "Post Run actions/checkout@v4",
+              "conclusion": "success"
+            },
+            {
+              "name": "Complete job",
+              "conclusion": "success"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "archived_raw_sha256": {
+    "m0-windows-2026-11-03-verify.txt": "72b919804f267a9c96a1fff6c870f628334d3897855c4b8f67fab31098b31b8a",
+    "m0-windows-2026-11-03.json": "82878ebf33d25759d768a2ec9631236c7eaaeff7a547fad916fde1a6ddfcfe6d"
+  },
+  "limits": [
+    "No new correlated editable-startup or input/display samples",
+    "Raw memory report presentation rows remain Pending; acceptance is separate",
+    "Known full-document layout, glyph/shaping and memory-margin limits remain",
+    "Separate unmerged render/native branch results do not establish baseline behavior"
+  ]
+}

@@ -1,0 +1,142 @@
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.18s
+     Running `target\debug\xtask.exe verify`
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.45s
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.37s
+     Running unittests src\main.rs (target\debug\deps\rusteditor_desktop-051f2a549de77f7e.exe)
+
+running 1 test
+test fonts::tests::malformed_and_missing_glyph_fonts_are_rejected_before_registration ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src\lib.rs (target\debug\deps\rusteditor_editor_core-4d2613a20cb75ea6.exe)
+
+running 5 tests
+test tests::draft_diff_never_splits_multibyte_prefixes_or_suffixes ... ok
+test tests::invalid_edits_are_atomic_and_stale_edits_cannot_apply_after_undo ... ok
+test tests::unicode_edit_undo_and_redo_keep_monotonic_revisions_and_selection ... ok
+test tests::limits_and_revision_overflow_preserve_the_document ... ok
+test tests::randomized_operations_match_a_reference_string_and_history ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src\lib.rs (target\debug\deps\rusteditor_editor_view-ad5e62fbac510b5b.exe)
+
+running 22 tests
+test grapheme::tests::boundaries_match_forward_segmentation_at_every_scalar_in_context ... ok
+test tests::empty_preedit_and_focus_loss_preserve_core_text ... ok
+test tests::ordinary_text_surrounding_an_ime_session_in_one_frame_is_not_lost ... ok
+test tests::pointer_cancels_an_observed_session_before_nonempty_preedit ... ok
+test tests::bare_ime_commits_work_after_unfocused_frames_and_normal_focus_changes ... ok
+test tests::inserting_next_to_combining_text_records_a_valid_redo_caret ... ok
+test tests::native_preedit_clear_does_not_revive_a_cancelled_session ... ok
+test tests::ime_preedit_is_an_overlay_and_commit_is_one_atomic_transaction ... ok
+test tests::native_preedit_clear_before_commit_preserves_the_composition_range ... ok
+test tests::horizontal_navigation_and_directed_selection_use_whole_graphemes ... ok
+test tests::caret_and_hit_testing_use_logical_coordinates_at_multiple_scales ... ok
+test tests::vertical_navigation_retains_the_preferred_column_across_short_lines ... ok
+test tests::oversized_ime_commit_is_atomic_and_does_not_leave_preedit_in_history ... ok
+test tests::oversized_paste_preserves_original_selection_revision_and_history ... ok
+test tests::cancelling_before_nonempty_preedit_rejects_late_commits ... ok
+test tests::same_frame_paste_navigation_and_deletion_observe_each_previous_event ... ok
+test tests::cancelled_or_stale_ime_never_deletes_original_text_or_replays_a_late_commit ... ok
+test tests::word_navigation_deletion_and_plugin_selections_keep_whole_clusters ... ok
+test tests::pointer_hit_testing_snaps_to_a_grapheme_boundary ... ok
+test tests::native_ime_area_tracks_the_caret_after_scrolling_at_multiple_scales ... ok
+test tests::backspace_and_delete_remove_one_cluster_and_are_one_undo_step ... ok
+test tests::randomized_input_batches_match_an_independent_grapheme_reference ... ok
+
+test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+
+     Running unittests src\lib.rs (target\debug\deps\rusteditor_plugin_api-7bcc57b199083d21.exe)
+
+running 1 test
+test tests::header_prefix_and_append_only_negotiation ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src\lib.rs (target\debug\deps\rusteditor_plugin_host-ed401f82db422dd3.exe)
+
+running 3 tests
+test callbacks::tests::replacement_validates_identity_revision_utf8_boundaries_and_reentrancy ... ok
+test callbacks::tests::callbacks_convert_unwindable_host_panics ... ok
+test callbacks::tests::snapshot_capacity_stale_revision_and_short_output_header ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\dynamic.rs (target\debug\deps\dynamic-58c62c057cc99532.exe)
+
+running 8 tests
+test abort_probe_child ... ok
+test starts_without_plugins_and_rejects_runtime_loading ... ok
+
+thread '<unnamed>' (34148) panicked at tests/fixtures/probe.rs:30:13:
+catchable plugin panic
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test real_text_tools_changes_selection_in_one_undoable_transaction ... ok
+test cleanup_order_and_failed_shutdown_retention ... ok
+test catches_panics_rejects_stale_replacements_and_wrong_thread_calls ... ok
+test rejects_duplicate_ids_target_mismatch_and_path_escape_before_loading ... ok
+test rejects_native_negotiation_and_initialization_failures_without_commands ... ok
+test native_abort_runs_only_in_a_subprocess ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.45s
+
+     Running unittests src\lib.rs (target\debug\deps\rusteditor_plugin_sdk-1b209d807345cba4.exe)
+
+running 2 tests
+test tests::short_table_is_rejected_before_reading_its_tail ... ok
+test tests::catches_panics_and_validates_foreign_buffers ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src\lib.rs (target\debug\deps\rusteditor_text_tools-aa7534a2e1243232.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src\main.rs (target\debug\deps\xtask-fe1ff5780450d6fc.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests rusteditor_editor_core
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests rusteditor_editor_view
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests rusteditor_plugin_api
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests rusteditor_plugin_host
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests rusteditor_plugin_sdk
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.30s
+Staged text-tools in D:\code\RustEditor\target\debug\plugins\text-tools
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.30s
+     Running `target\debug\rusteditor-desktop.exe --smoke-test`
+[M0:OK] real dynamic plugin; Unicode selection replacement; undo/redo; revision 4
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.35s
+     Running `target\debug\rusteditor-desktop.exe --smoke-test --no-plugins`
+[M0:OK] no-plugin startup; document revision 1
