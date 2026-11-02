@@ -82,11 +82,7 @@ mod tests {
         {
             assert_eq!(
                 floor(text, byte),
-                *boundaries
-                    .iter()
-                    .filter(|&&i| i <= byte)
-                    .next_back()
-                    .unwrap()
+                *boundaries.iter().rfind(|&&i| i <= byte).unwrap()
             );
             assert_eq!(
                 ceil(text, byte),
@@ -94,12 +90,7 @@ mod tests {
             );
             assert_eq!(
                 previous(text, byte),
-                boundaries
-                    .iter()
-                    .copied()
-                    .filter(|&i| i < byte)
-                    .next_back()
-                    .unwrap_or(0)
+                boundaries.iter().copied().rfind(|&i| i < byte).unwrap_or(0)
             );
             assert_eq!(
                 next(text, byte),
