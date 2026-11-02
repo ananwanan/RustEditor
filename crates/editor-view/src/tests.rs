@@ -616,12 +616,7 @@ fn randomized_input_batches_match_an_independent_grapheme_reference() {
                 .map(|(i, _)| i)
                 .chain(std::iter::once(reference.len()))
                 .collect();
-            let previous = bounds
-                .iter()
-                .copied()
-                .filter(|&i| i < caret)
-                .next_back()
-                .unwrap_or(0);
+            let previous = bounds.iter().copied().rfind(|&i| i < caret).unwrap_or(0);
             let next = bounds
                 .iter()
                 .copied()
