@@ -1,4 +1,8 @@
-#![forbid(unsafe_code)]
+#![deny(unsafe_code)]
+
+#[allow(unsafe_code)]
+mod save;
+pub use save::{DiskBaseline, SaveError, SaveOutcome, SaveTarget, inspect_save_target, save_utf8};
 
 use rusteditor_editor_core::MAX_DOCUMENT_BYTES;
 use std::{
@@ -52,6 +56,16 @@ impl std::error::Error for OpenError {
 
 /// Reads one regular file as strict UTF-8 without a BOM, preserving its line endings.
 pub fn open_utf8(path: &Path) -> Result<String, OpenError> {
+    open_utf8_impl(path, false).map(|(text, _)| text)
+}
+
+/// Also capture the disk state from the handle that supplied the editor contents.
+pub fn open_utf8_for_editing(path: &Path) -> Result<(String, DiskBaseline), OpenError> {
+    let (text, baseline) = open_utf8_impl(path, true)?;
+    Ok((text, baseline.expect("baseline requested")))
+}
+
+fn open_utf8_impl(path: &Path, track: bool) -> Result<(String, Option<DiskBaseline>), OpenError> {
     // Windows can report access denied when opening a directory as a file.
     check_file_type(&fs::metadata(path).map_err(open_error)?)?;
     let file = File::open(path).map_err(open_error)?;
@@ -60,7 +74,12 @@ pub fn open_utf8(path: &Path) -> Result<String, OpenError> {
     if metadata.len() > MAX_DOCUMENT_BYTES as u64 {
         return Err(OpenError::TooLarge);
     }
-    read_utf8(file, metadata.len() as usize)
+    let text = read_utf8(&file, metadata.len() as usize)?;
+    let baseline = track
+        .then(|| DiskBaseline::from_open(&file, &metadata, text.as_bytes()))
+        .transpose()
+        .map_err(read_error)?;
+    Ok((text, baseline))
 }
 
 fn check_file_type(metadata: &Metadata) -> Result<(), OpenError> {

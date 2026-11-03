@@ -1,13 +1,16 @@
 #![forbid(unsafe_code)]
+use crate::save::{Completion, FileAssociation, SaveDialog, SaveSession};
 use eframe::egui::{self, Color32, Key, Modifiers};
 use rusteditor_editor_view::EditorView;
+use rusteditor_file_io::SaveTarget;
 use rusteditor_plugin_host::{PluginHost, SharedDocument};
+use std::{path::PathBuf, sync::Arc};
 
 pub struct EditorApp {
     document: SharedDocument,
     host: PluginHost,
     diagnostics: Vec<String>,
-    filename: Option<String>,
+    save: SaveSession,
     status: String,
     editor: EditorView,
     composing: bool,
@@ -22,7 +25,7 @@ impl EditorApp {
         document: SharedDocument,
         host: PluginHost,
         diagnostics: Vec<String>,
-        filename: Option<String>,
+        association: Option<FileAssociation>,
     ) -> Self {
         let mut style = (*cc.egui_ctx.style()).clone();
         style.visuals = egui::Visuals::dark();
@@ -32,11 +35,13 @@ impl EditorApp {
         style.spacing.item_spacing = egui::vec2(10.0, 9.0);
         cc.egui_ctx.set_style(style);
         let font_status = crate::fonts::install(&cc.egui_ctx);
+        let mut save = SaveSession::default();
+        save.association = association;
         Self {
             document,
             host,
             diagnostics,
-            filename,
+            save,
             status: "Ready".into(),
             editor: EditorView::default(),
             composing: false,
@@ -62,6 +67,168 @@ impl EditorApp {
             Err(error) => self.status = error.to_string(),
         }
     }
+
+    fn save_failed(&mut self, error: String) {
+        self.save.close_after_write = false;
+        self.status = format!("Save failed: {error}");
+        if self.save.dialog.is_none() {
+            self.editor.request_focus();
+        }
+    }
+
+    fn start_write(&mut self, path: PathBuf, target: Arc<SaveTarget>) {
+        self.save.dialog = None;
+        let snapshot = self.document.borrow().capture_save_snapshot();
+        match self.save.write(path, target, snapshot) {
+            Ok(()) => {
+                self.status = "Saving…".into();
+                self.editor.request_focus();
+            }
+            Err(error) => self.save_failed(error),
+        }
+    }
+
+    fn start_save(&mut self, save_as: bool) {
+        if save_as || self.save.association.is_none() {
+            self.status = "Choose a save destination".into();
+            self.save.choose_path();
+        } else if let Some(file) = &self.save.association {
+            match &file.target {
+                Some(target) => self.start_write(file.path.clone(), Arc::clone(target)),
+                None => self.save_failed("destination could not be verified. Use Save As".into()),
+            }
+        }
+    }
+
+    fn close(&mut self, ctx: &egui::Context) {
+        self.allow_close = true;
+        ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+    }
+
+    fn finish_save(&mut self, ctx: &egui::Context) {
+        let Some(result) = self.save.poll(ctx) else {
+            return;
+        };
+        match result {
+            Ok(Completion::Inspected {
+                path,
+                target: SaveTarget::New,
+            }) => {
+                self.start_write(path, Arc::new(SaveTarget::New));
+            }
+            Ok(Completion::Inspected { path, target }) => {
+                self.save.dialog = Some(SaveDialog::Overwrite { path, target });
+                self.status = "Confirm the replacement destination".into();
+            }
+            Ok(Completion::Written {
+                path,
+                snapshot,
+                outcome,
+            }) => {
+                let verified = outcome.baseline.is_some();
+                let revision = snapshot.revision().0;
+                self.save.association = Some(FileAssociation::new(path.clone(), outcome.baseline));
+                if verified {
+                    let result = self.document.borrow_mut().mark_snapshot_saved(snapshot);
+                    if let Err(error) = result {
+                        self.save_failed(error.to_string());
+                        return;
+                    }
+                }
+                let dirty = self.document.borrow().is_modified();
+                self.status = if let Some(warning) = &outcome.warning {
+                    format!("Wrote {}. {warning}", path.display())
+                } else if dirty {
+                    format!("Saved revision {revision}. Newer edits are unsaved")
+                } else {
+                    format!(
+                        "Saved {}",
+                        path.file_name()
+                            .unwrap_or(path.as_os_str())
+                            .to_string_lossy()
+                    )
+                };
+                if std::mem::take(&mut self.save.close_after_write)
+                    && outcome.warning.is_none()
+                    && !self.composing
+                    && !self.editor.is_composing()
+                {
+                    if dirty {
+                        self.confirm_close = true;
+                    } else {
+                        self.close(ctx);
+                    }
+                }
+            }
+            Err(error) => self.save_failed(error),
+        }
+        ctx.request_repaint();
+    }
+
+    fn show_save_dialog(&mut self, ctx: &egui::Context) {
+        let Some(dialog) = self.save.dialog.as_ref() else {
+            return;
+        };
+        let mut accept = false;
+        let mut cancel = false;
+        let busy = self.save.busy();
+        let focus_path = std::mem::take(&mut self.save.focus_path);
+        let modal = egui::Modal::new(egui::Id::new("save_destination")).show(ctx, |ui| {
+            match dialog {
+                SaveDialog::Path => {
+                    ui.heading("Save As");
+                    ui.label("Destination path");
+                    let input = ui.add(
+                        egui::TextEdit::singleline(&mut self.save.path_input).desired_width(420.0),
+                    );
+                    if focus_path {
+                        input.request_focus();
+                    }
+                    accept = !self.save.path_input.is_empty()
+                        && input.lost_focus()
+                        && ui.input(|input| input.key_pressed(Key::Enter));
+                }
+                SaveDialog::Overwrite { path, .. } => {
+                    ui.heading("Replace existing file?");
+                    ui.label(path.display().to_string());
+                }
+            }
+            ui.label(&self.status);
+            ui.horizontal(|ui| {
+                let label = match dialog {
+                    SaveDialog::Path => "Continue",
+                    SaveDialog::Overwrite { .. } => "Replace",
+                };
+                accept |= ui
+                    .add_enabled(
+                        !busy && !self.save.path_input.is_empty(),
+                        egui::Button::new(label),
+                    )
+                    .clicked();
+                cancel = ui.add_enabled(!busy, egui::Button::new("Cancel")).clicked();
+            });
+        });
+        if self.save.busy() {
+            return;
+        }
+        if cancel || modal.should_close() {
+            self.save.dialog = None;
+            self.save.close_after_write = false;
+            self.status = "Save As canceled".into();
+            self.editor.request_focus();
+        } else if accept {
+            match self.save.dialog.take().expect("shown dialog") {
+                SaveDialog::Path => {
+                    self.save.dialog = Some(SaveDialog::Path);
+                    match self.save.inspect(PathBuf::from(&self.save.path_input)) {
+                        Ok(()) => self.status = "Checking destination…".into(),
+                        Err(error) => self.save_failed(error),
+                    }
+                }
+                SaveDialog::Overwrite { path, target } => self.start_write(path, Arc::new(target)),
+            }
+        }
+    }
 }
 
 impl eframe::App for EditorApp {
@@ -70,8 +237,25 @@ impl eframe::App for EditorApp {
         let mut action = None;
         let mut undo = false;
         let mut redo = false;
-        if !self.composing {
+        let mut save = false;
+        let mut save_as = false;
+        let modal_open = self.confirm_close || self.save.dialog.is_some();
+        let can_command = !modal_open && !self.composing;
+        let can_save = can_command && !self.save.busy();
+        if can_command {
             ctx.input_mut(|input| {
+                if can_save {
+                    save_as = input.consume_shortcut(&egui::KeyboardShortcut::new(
+                        Modifiers::COMMAND | Modifiers::SHIFT,
+                        Key::S,
+                    ));
+                    if !save_as {
+                        save = input.consume_shortcut(&egui::KeyboardShortcut::new(
+                            Modifiers::COMMAND,
+                            Key::S,
+                        ));
+                    }
+                }
                 if input.consume_shortcut(&egui::KeyboardShortcut::new(
                     Modifiers::COMMAND | Modifiers::SHIFT,
                     Key::U,
@@ -96,23 +280,38 @@ impl eframe::App for EditorApp {
                         .color(Color32::GRAY),
                 );
             });
-            if let Some(filename) = &self.filename {
-                ui.label(egui::RichText::new(filename).strong());
-            }
+            let filename = self
+                .save
+                .association
+                .as_ref()
+                .and_then(|file| file.path.file_name())
+                .map_or_else(|| "Scratch buffer".into(), |name| name.to_string_lossy());
+            let modified = if self.document.borrow().is_modified() {
+                " *"
+            } else {
+                ""
+            };
+            ui.label(egui::RichText::new(format!("{filename}{modified}")).strong());
             ui.separator();
             ui.horizontal(|ui| {
+                save |= ui
+                    .add_enabled(can_save, egui::Button::new("Save"))
+                    .clicked();
+                save_as |= ui
+                    .add_enabled(can_save, egui::Button::new("Save As"))
+                    .clicked();
                 let doc = self.document.borrow();
                 undo |= ui
-                    .add_enabled(!self.composing && doc.can_undo(), egui::Button::new("Undo"))
+                    .add_enabled(can_command && doc.can_undo(), egui::Button::new("Undo"))
                     .clicked();
                 redo |= ui
-                    .add_enabled(!self.composing && doc.can_redo(), egui::Button::new("Redo"))
+                    .add_enabled(can_command && doc.can_redo(), egui::Button::new("Redo"))
                     .clicked();
                 drop(doc);
                 ui.menu_button("Plugins", |ui| {
                     for command in self.host.commands() {
                         if ui
-                            .add_enabled(!self.composing, egui::Button::new(&command.title))
+                            .add_enabled(can_command, egui::Button::new(&command.title))
                             .clicked()
                         {
                             action = Some(command.id);
@@ -124,14 +323,10 @@ impl eframe::App for EditorApp {
                     }
                 });
                 ui.separator();
-                let source_status = if self.filename.is_some() {
-                    "Read from disk · Saving not yet available"
-                } else {
-                    "Scratch buffer · not saved to disk"
-                };
-                ui.label(
-                    egui::RichText::new(source_status).color(Color32::from_rgb(236, 186, 114)),
-                );
+                if self.save.busy() {
+                    ui.spinner();
+                    ui.label("Save in progress");
+                }
             });
             ui.add_space(3.0);
         });
@@ -152,7 +347,7 @@ impl eframe::App for EditorApp {
             for command in self.host.commands() {
                 ui.label(egui::RichText::new(&command.title).strong());
                 ui.label(egui::RichText::new(&command.plugin_id).small());
-                if ui.add_enabled(!self.composing, egui::Button::new("Run command")).clicked() { action = Some(command.id); }
+                if ui.add_enabled(can_command, egui::Button::new("Run command")).clicked() { action = Some(command.id); }
             }
             if self.host.commands().is_empty() {
                 ui.label("Run cargo xtask stage, then restart to enable text-tools.");
@@ -166,9 +361,8 @@ impl eframe::App for EditorApp {
 
         egui::TopBottomPanel::bottom("status").show(ctx, |ui| {
             let doc = self.document.borrow();
+            ui.add(egui::Label::new(&self.status).wrap());
             ui.horizontal(|ui| {
-                ui.label(&self.status);
-                ui.separator();
                 ui.label(format!(
                     "UTF-8 · {} bytes · revision {} · selection {} bytes",
                     doc.text().len(),
@@ -185,7 +379,7 @@ impl eframe::App for EditorApp {
         });
 
         egui::CentralPanel::default().show(ctx, |ui| {
-            ui.add_enabled_ui(!self.confirm_close, |ui| {
+            ui.add_enabled_ui(!modal_open, |ui| {
                 egui::ScrollArea::both()
                     .auto_shrink([false, false])
                     .show(ui, |ui| {
@@ -214,28 +408,48 @@ impl eframe::App for EditorApp {
             }
             ctx.request_repaint();
         }
-        // Protect any document edited during this session, even after undo.
-        if ctx.input(|input| input.viewport().close_requested())
-            && !self.allow_close
-            && self.document.borrow().revision().0 > 1
-        {
-            ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
-            self.confirm_close = true;
+        if save || save_as {
+            self.start_save(save_as);
         }
+        if ctx.input(|input| input.viewport().close_requested()) && !self.allow_close {
+            let dirty = self.document.borrow().is_modified();
+            if self.save.busy() || self.save.dialog.is_some() || dirty || self.composing {
+                ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
+                if self.save.dialog.is_none() && !self.composing {
+                    if self.save.busy() {
+                        self.save.close_after_write = true;
+                    } else {
+                        self.confirm_close = dirty;
+                    }
+                }
+            }
+        }
+        self.finish_save(ctx);
         if self.confirm_close {
-            egui::Modal::new(egui::Id::new("close_scratch")).show(ctx, |ui| {
-                ui.heading("Discard editing session?");
-                ui.label("Closing discards in-memory edits. Saving is not yet available.");
+            let mut cancel = false;
+            let modal = egui::Modal::new(egui::Id::new("close_scratch")).show(ctx, |ui| {
+                ui.heading("Save changes before closing?");
+                ui.label(&self.status);
                 ui.horizontal(|ui| {
-                    if ui.button("Keep editing").clicked() {
+                    if ui.button("Save").clicked() {
                         self.confirm_close = false;
+                        self.save.close_after_write = true;
+                        self.start_save(false);
                     }
-                    if ui.button("Discard and close").clicked() {
-                        self.allow_close = true;
-                        ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+                    if ui.button("Discard").clicked() {
+                        self.close(ctx);
                     }
+                    cancel = ui.button("Cancel").clicked();
                 });
             });
+            if cancel || modal.should_close() {
+                self.confirm_close = false;
+                self.editor.request_focus();
+            }
+        }
+        self.show_save_dialog(ctx);
+        if self.save.busy() {
+            ctx.request_repaint_after(std::time::Duration::from_millis(25));
         }
     }
 }

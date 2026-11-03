@@ -1,7 +1,7 @@
 //! Bounded, GUI-independent M0 document model. Public offsets are UTF-8 bytes.
 #![forbid(unsafe_code)]
 
-use std::{collections::VecDeque, fmt, ops::Range};
+use std::{collections::VecDeque, fmt, ops::Range, sync::Arc};
 
 pub const MAX_DOCUMENT_BYTES: usize = 4 * 1024 * 1024;
 const MAX_HISTORY_BYTES: usize = 8 * 1024 * 1024;
@@ -12,6 +12,34 @@ pub struct DocumentId(pub u64);
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Revision(pub u64);
+
+/// Immutable contents associated with one document revision.
+#[derive(Clone, Debug)]
+pub struct SaveSnapshot {
+    document_id: DocumentId,
+    revision: Revision,
+    text: Arc<str>,
+}
+
+impl SaveSnapshot {
+    pub fn document_id(&self) -> DocumentId {
+        self.document_id
+    }
+
+    pub fn revision(&self) -> Revision {
+        self.revision
+    }
+
+    pub fn text(&self) -> &str {
+        &self.text
+    }
+}
+
+#[derive(Debug)]
+struct SaveState {
+    snapshot: SaveSnapshot,
+    modified: bool,
+}
 
 /// Direction is preserved; both endpoints must be UTF-8 character boundaries.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -76,6 +104,7 @@ pub struct Document {
     undo: VecDeque<Change>,
     redo: Vec<Change>,
     history_bytes: usize,
+    save: SaveState,
 }
 
 impl Document {
@@ -90,6 +119,14 @@ impl Document {
         Ok(Self {
             id,
             revision: Revision(1),
+            save: SaveState {
+                snapshot: SaveSnapshot {
+                    document_id: id,
+                    revision: Revision(1),
+                    text: Arc::from(text.as_str()),
+                },
+                modified: false,
+            },
             text,
             selection: Selection::default(),
             undo: VecDeque::new(),
@@ -106,6 +143,40 @@ impl Document {
     }
     pub fn text(&self) -> &str {
         &self.text
+    }
+
+    pub fn is_modified(&self) -> bool {
+        self.save.modified
+    }
+
+    pub fn capture_save_snapshot(&self) -> SaveSnapshot {
+        SaveSnapshot {
+            document_id: self.id,
+            revision: self.revision,
+            text: if self.is_modified() {
+                Arc::from(self.text.as_str())
+            } else {
+                Arc::clone(&self.save.snapshot.text)
+            },
+        }
+    }
+
+    /// Call after a successful write. Saves for this document must be serialized.
+    /// The written revision may be older than the current editing revision.
+    pub fn mark_snapshot_saved(&mut self, snapshot: SaveSnapshot) -> Result<(), EditError> {
+        if snapshot.document_id != self.id {
+            return Err(EditError::WrongDocument);
+        }
+        if snapshot.revision > self.revision {
+            return Err(EditError::StaleRevision);
+        }
+        self.save.snapshot = snapshot;
+        self.refresh_modified();
+        Ok(())
+    }
+
+    fn refresh_modified(&mut self) {
+        self.save.modified = self.text != self.save.snapshot.text();
     }
     pub fn selection(&self) -> Selection {
         self.selection
@@ -175,6 +246,7 @@ impl Document {
         self.text = result;
         self.selection = transaction.selection_after;
         self.revision = next_revision;
+        self.refresh_modified();
         Ok(self.revision)
     }
 
@@ -250,6 +322,7 @@ impl Document {
         self.selection = change.before;
         self.redo.push(change);
         self.revision = revision;
+        self.refresh_modified();
         Ok(true)
     }
 
@@ -266,6 +339,7 @@ impl Document {
         self.selection = change.after;
         self.undo.push_back(change);
         self.revision = revision;
+        self.refresh_modified();
         Ok(true)
     }
 
@@ -429,5 +503,40 @@ mod tests {
             assert_eq!(doc.can_redo(), !redo.is_empty());
             validate_selection(doc.text(), doc.selection()).unwrap();
         }
+    }
+
+    #[test]
+    fn dirty_state_tracks_exact_contents_across_history_and_selection() {
+        let mut doc = Document::new(DocumentId(1), "中🙂e\u{301}").unwrap();
+        assert!(!doc.is_modified());
+        doc.set_selection(Selection { anchor: 0, head: 3 }).unwrap();
+        assert!(!doc.is_modified());
+        doc.replace(0..3, "文").unwrap();
+        assert!(doc.is_modified());
+        assert!(doc.undo().unwrap());
+        assert!(!doc.is_modified());
+        assert!(doc.redo().unwrap());
+        assert!(doc.is_modified());
+        let saved = doc.capture_save_snapshot();
+        doc.mark_snapshot_saved(saved.clone()).unwrap();
+        assert!(!doc.is_modified());
+        assert!(doc.undo().unwrap());
+        assert!(doc.is_modified());
+        assert!(doc.redo().unwrap());
+        assert!(!doc.is_modified());
+        assert!(doc.revision() > saved.revision());
+
+        doc.replace(0..3, "字").unwrap();
+        doc.replace(0..3, "文").unwrap();
+        assert!(
+            !doc.is_modified(),
+            "independent edits can reproduce saved bytes"
+        );
+        let mut other = Document::new(DocumentId(2), "other").unwrap();
+        assert_eq!(
+            other.mark_snapshot_saved(saved),
+            Err(EditError::WrongDocument)
+        );
+        assert!(!other.is_modified());
     }
 }
