@@ -5,10 +5,10 @@ use std::{
     sync::atomic::{AtomicUsize, Ordering},
 };
 
-struct TempDirectory(PathBuf);
+pub(crate) struct TempDirectory(pub(crate) PathBuf);
 
 impl TempDirectory {
-    fn new() -> Self {
+    pub(crate) fn new() -> Self {
         static NEXT: AtomicUsize = AtomicUsize::new(0);
         let path = std::env::temp_dir().join(format!(
             "rusteditor-open-{}-{}",
@@ -19,7 +19,7 @@ impl TempDirectory {
         Self(path)
     }
 
-    fn write(&self, bytes: &[u8]) -> PathBuf {
+    pub(crate) fn write(&self, bytes: &[u8]) -> PathBuf {
         let path = self.0.join("fixture.txt");
         fs::write(&path, bytes).unwrap();
         path

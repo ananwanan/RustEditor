@@ -4,7 +4,7 @@ A Rust desktop text and code editor. Features are separated into a Cargo workspa
 
 Current status: **M0 accepted with maintainer-approved evidence exceptions on 2026-11-03; M1 in progress**. The native desktop, editing core, C ABI/SDK, dynamic plugin host, text-tools extension, and development tooling are runnable. Microsoft Pinyin, native 100%/150%/200% scaling and input-to-present tests are passed by maintainer attestation; their original records were not retained. Detailed native/display results are not independently reproducible from that confirmation. Known font/layout limits remain documented.
 
-The [November 3 sign-off and revalidation](docs/acceptance/M0_2026-11-03.md) separates that acceptance decision from archived evidence: 42 local Windows Rust tests and 4 Python tests passed, native 125% multiline Notepad clipboard/shortcut/close checks passed, and 50 release idle working-set samples peaked at 149.7070 MiB. [Main CI at `c65c271`](https://github.com/ananwanan/RustEditor/actions/runs/41481683607) passed on Windows and Ubuntu after the LF checkout fix. The [historical M0 record](docs/acceptance/M0.md) is preserved. The [M1 acceptance record](docs/acceptance/M1.md) tracks bounded UTF-8 opening and the remaining editing gates.
+The [November 3 sign-off and revalidation](docs/acceptance/M0_2026-11-03.md) separates that acceptance decision from archived evidence: 42 local Windows Rust tests and 4 Python tests passed, native 125% multiline Notepad clipboard/shortcut/close checks passed, and 50 release idle working-set samples peaked at 149.7070 MiB. [Main CI at `c65c271`](https://github.com/ananwanan/RustEditor/actions/runs/41481683607) passed on Windows and Ubuntu after the LF checkout fix. The [historical M0 record](docs/acceptance/M0.md) is preserved. The [M1 acceptance record](docs/acceptance/M1.md) tracks bounded UTF-8 opening, safe saving, and the remaining editing gates.
 
 - [Architecture, technology choices, and workspace](docs/ARCHITECTURE.md)
 - [Dynamic library plugin protocol](docs/PLUGIN_ABI.md)
@@ -34,13 +34,19 @@ cargo run --locked -p rusteditor-desktop
 
 Select text and run **Plugins → Uppercase selection**, **Run command** in the Extensions panel, or **Ctrl+Shift+U**. The example extension is a separately built native library, not linked into the desktop. Its transaction preserves Chinese/emoji and supports Unicode case expansion such as `straße` → `STRASSE`. Ctrl+Z undoes; Ctrl+Y or Ctrl+Shift+Z redoes. Clipboard shortcuts are handled by the native GUI integration.
 
-Start with an existing file from the repository root.
+Start with a copy of the sample file from the repository root.
 
 ```powershell
-cargo run --locked -p rusteditor-desktop -- --open ".\tests\fixtures\probe.rs"
+New-Item -ItemType Directory -Force target/m1-save-tests | Out-Null
+Copy-Item tests/fixtures/probe.rs target/m1-save-tests/probe.rs
+cargo run --locked -p rusteditor-desktop -- --open ".\target\m1-save-tests\probe.rs"
 ```
 
-The editor opens one UTF-8 file without a BOM and preserves LF and CRLF bytes on load. Read-only and empty files are supported. The toolbar shows the filename and **Read from disk · Saving not yet available**. Edits are temporary. Without `--open`, the editor starts with the scratch preview. Closing an editing session after an edit requires discard confirmation, even after undo. Saving, tabs, encoding conversion, recovery, and large-file mode are pending. Documents are limited to 4 MiB; undo retains at most 256 transactions and 8 MiB of text deltas. The core-driven editor-view uses extended grapheme boundaries for horizontal movement, selections, hit testing, and deletion. IME preedit remains a presentation overlay until one commit transaction; the acceptance record distinguishes archived native observations from maintainer-attested passes.
+The editor opens and saves one UTF-8 file without encoding conversion. It preserves existing LF and CRLF bytes. **Save** (Ctrl+S) writes the current path, and **Save As** (Ctrl+Shift+S) accepts a path with spaces and Unicode and asks before replacing a file. Use Command in place of Ctrl on macOS. Without `--open`, the editor starts with a scratch preview and prompts for a path on its first save. A star marks unsaved text and clears when the contents match the saved text, including after undo. Closing a modified document offers **Save**, **Discard**, and **Cancel**.
+
+Saves write an immutable snapshot in the background. If the destination has changed, been replaced, or disappeared, ordinary Save stops and offers Save As as a way to retain your edits. Read-only files can be opened, and saving to a locked or unsupported destination can fail with an error. See the [save strategy and platform limits](docs/ARCHITECTURE.md#m12-saving-and-modified-state). Tabs, encoding conversion, recovery, and large-file mode are pending.
+
+Documents are limited to 4 MiB; undo retains at most 256 transactions and 8 MiB of text deltas. The core-driven editor-view uses extended grapheme boundaries for horizontal movement, selections, hit testing, and deletion. IME preedit remains a presentation overlay until one commit transaction; the acceptance record distinguishes archived native observations from maintainer-attested passes.
 
 Chinese glyphs use an installed system font (Microsoft YaHei on Windows, Noto Sans CJK on Linux, PingFang on macOS). Set `RUSTEDITOR_FONT` to an outline TTF/TTC/OTF path if detection fails. Emoji fallback tries Segoe UI Emoji on Windows and Noto Emoji on Linux; `RUSTEDITOR_EMOJI_FONT` selects an explicit font. Fonts are size-bounded, parsed, and checked for representative outline glyphs before registration; invalid or bitmap-only fonts produce diagnostics and fall back safely. No additional font files are bundled. Emoji render as monochrome glyphs; color and ZWJ ligature shaping are not implemented. Complete platform/font coverage remains follow-up validation beyond the documented M0 prototype limits.
 

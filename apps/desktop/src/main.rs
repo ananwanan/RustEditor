@@ -3,10 +3,11 @@
 
 mod fonts;
 mod native;
+mod save;
 mod view;
 
 use rusteditor_editor_core::{Document, DocumentId, Selection};
-use rusteditor_file_io::open_utf8;
+use rusteditor_file_io::open_utf8_for_editing;
 use rusteditor_plugin_host::{PluginHost, SharedDocument};
 use std::{cell::RefCell, ffi::OsString, path::PathBuf, rc::Rc};
 
@@ -49,7 +50,7 @@ fn options(mut args: impl Iterator<Item = OsString>) -> Result<Option<Options>, 
             Some("--empty") => result.empty = true,
             Some("--help" | "-h") => {
                 println!(
-                    "RustEditor\n\n  --plugin-dir PATH  Enable trusted native plugins in PATH at startup\n  --no-plugins       Start without loading any plugins\n  --smoke-test       Verify the core/host path without opening a window\n  --empty            Open an empty scratch buffer (for GUI validation)\n  --open PATH        Open a UTF-8 file without BOM (up to 4 MiB)\n\n--open cannot be combined with --empty or --smoke-test. Saving is not yet available.\nDefault: plugins next to the executable. Native code has host-process privileges."
+                    "RustEditor\n\n  --plugin-dir PATH  Enable trusted native plugins in PATH at startup\n  --no-plugins       Start without loading any plugins\n  --smoke-test       Verify the core/host path without opening a window\n  --empty            Open an empty scratch buffer (for GUI validation)\n  --open PATH        Open a UTF-8 file without BOM (up to 4 MiB)\n\n--open cannot be combined with --empty or --smoke-test.\nDefault: plugins next to the executable. Native code has host-process privileges."
                 );
                 return Ok(None);
             }
@@ -75,17 +76,25 @@ fn main() {
     }
 }
 
-fn initial_document(options: &Options) -> Result<Document, String> {
+fn initial_document(
+    options: &Options,
+) -> Result<(Document, Option<save::FileAssociation>), String> {
     if let Some(path) = &options.open {
-        let text = open_utf8(path).map_err(|error| format!("{}: {error}", path.display()))?;
-        return Document::new(DocumentId(1), text).map_err(|error| error.to_string());
+        let path = std::path::absolute(path).map_err(|error| error.to_string())?;
+        let (text, baseline) =
+            open_utf8_for_editing(&path).map_err(|error| format!("{}: {error}", path.display()))?;
+        let document = Document::new(DocumentId(1), text).map_err(|error| error.to_string())?;
+        return Ok((
+            document,
+            Some(save::FileAssociation::new(path, Some(baseline))),
+        ));
     }
     let text = if options.smoke {
         SMOKE_TEXT
     } else if options.empty {
         ""
     } else {
-        "Hello, RustEditor! 你好，世界！ straße 👩‍💻 e\u{301}\n\nSelect text, then use Plugins → Uppercase selection (Ctrl+Shift+U).\n\nThis scratch buffer is temporary. Start with --open PATH to open a file.\n"
+        "Hello, RustEditor! 你好，世界！ straße 👩‍💻 e\u{301}\n\nSelect text, then use Plugins → Uppercase selection (Ctrl+Shift+U).\n\nUse Save As to write this scratch buffer. Start with --open PATH to open a file.\n"
     };
     let mut document = Document::new(DocumentId(1), text).map_err(|e| e.to_string())?;
     let start = if options.smoke {
@@ -104,14 +113,14 @@ fn initial_document(options: &Options) -> Result<Document, String> {
             head: end,
         })
         .map_err(|e| e.to_string())?;
-    Ok(document)
+    Ok((document, None))
 }
 
 fn run() -> Result<(), String> {
     let Some(options) = options(std::env::args_os().skip(1))? else {
         return Ok(());
     };
-    let document = initial_document(&options)?;
+    let (document, association) = initial_document(&options)?;
     let document: SharedDocument = Rc::new(RefCell::new(document));
     let mut host = PluginHost::new(document.clone());
     let explicit_dir = options.plugin_dir.is_some();
@@ -143,15 +152,15 @@ fn run() -> Result<(), String> {
             host.invoke(UPPERCASE).map_err(|e| e.to_string())?;
             let mut doc = document.borrow_mut();
             let expected = "before | 你好 STRASSE🙂 E\u{301} | after";
-            if doc.text() != expected {
+            if doc.text() != expected || !doc.is_modified() {
                 return Err("dynamic selection transformation failed".into());
             }
             doc.undo().map_err(|e| e.to_string())?;
-            if doc.text() != SMOKE_TEXT {
+            if doc.text() != SMOKE_TEXT || doc.is_modified() {
                 return Err("plugin transaction undo failed".into());
             }
             doc.redo().map_err(|e| e.to_string())?;
-            if doc.text() != expected {
+            if doc.text() != expected || !doc.is_modified() {
                 return Err("plugin transaction redo failed".into());
             }
             println!(
@@ -162,11 +171,6 @@ fn run() -> Result<(), String> {
         host.shutdown();
         return Ok(());
     }
-    let filename = options
-        .open
-        .as_deref()
-        .and_then(std::path::Path::file_name)
-        .map(|name| name.to_string_lossy().into_owned());
     let native = eframe::NativeOptions {
         viewport: eframe::egui::ViewportBuilder::default()
             .with_inner_size([1120.0, 760.0])
@@ -183,7 +187,7 @@ fn run() -> Result<(), String> {
                 document,
                 host,
                 diagnostics,
-                filename,
+                association,
             )))
         }),
     )
@@ -233,12 +237,13 @@ mod tests {
     fn fixture_opens_in_the_core_and_retains_edit_history() {
         let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures/probe.rs");
         let original = std::fs::read(&path).unwrap();
-        let mut doc = initial_document(&Options {
+        let (mut doc, _) = initial_document(&Options {
             open: Some(path.clone()),
             ..Options::default()
         })
         .unwrap();
         assert_eq!(doc.text().as_bytes(), original);
+        assert!(!doc.is_modified());
         assert_eq!(doc.selection(), Selection::default());
         doc.replace(0..0, "你好🙂 e\u{301}").unwrap();
         assert!(doc.text().starts_with("你好🙂 e\u{301}"));

@@ -10,3 +10,9 @@ workspace = true
 
 [dependencies]
 rusteditor-editor-core.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "=0.61.2", features = ["Win32_Storage_FileSystem", "Win32_Security"] }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+libc = "0.2"
