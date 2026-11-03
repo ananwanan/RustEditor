@@ -7,6 +7,7 @@ pub struct EditorApp {
     document: SharedDocument,
     host: PluginHost,
     diagnostics: Vec<String>,
+    filename: Option<String>,
     status: String,
     editor: EditorView,
     composing: bool,
@@ -21,6 +22,7 @@ impl EditorApp {
         document: SharedDocument,
         host: PluginHost,
         diagnostics: Vec<String>,
+        filename: Option<String>,
     ) -> Self {
         let mut style = (*cc.egui_ctx.style()).clone();
         style.visuals = egui::Visuals::dark();
@@ -34,6 +36,7 @@ impl EditorApp {
             document,
             host,
             diagnostics,
+            filename,
             status: "Ready".into(),
             editor: EditorView::default(),
             composing: false,
@@ -88,11 +91,14 @@ impl eframe::App for EditorApp {
                         .color(Color32::from_rgb(119, 217, 234)),
                 );
                 ui.label(
-                    egui::RichText::new("M0 / TECHNICAL PREVIEW")
+                    egui::RichText::new("TECHNICAL PREVIEW")
                         .small()
                         .color(Color32::GRAY),
                 );
             });
+            if let Some(filename) = &self.filename {
+                ui.label(egui::RichText::new(filename).strong());
+            }
             ui.separator();
             ui.horizontal(|ui| {
                 let doc = self.document.borrow();
@@ -118,9 +124,13 @@ impl eframe::App for EditorApp {
                     }
                 });
                 ui.separator();
+                let source_status = if self.filename.is_some() {
+                    "Read from disk · Saving not yet available"
+                } else {
+                    "Scratch buffer · not saved to disk"
+                };
                 ui.label(
-                    egui::RichText::new("Scratch buffer · not saved to disk")
-                        .color(Color32::from_rgb(236, 186, 114)),
+                    egui::RichText::new(source_status).color(Color32::from_rgb(236, 186, 114)),
                 );
             });
             ui.add_space(3.0);
@@ -204,6 +214,7 @@ impl eframe::App for EditorApp {
             }
             ctx.request_repaint();
         }
+        // Protect any document edited during this session, even after undo.
         if ctx.input(|input| input.viewport().close_requested())
             && !self.allow_close
             && self.document.borrow().revision().0 > 1
@@ -213,8 +224,8 @@ impl eframe::App for EditorApp {
         }
         if self.confirm_close {
             egui::Modal::new(egui::Id::new("close_scratch")).show(ctx, |ui| {
-                ui.heading("Discard scratch text?");
-                ui.label("This preview does not save files. Closing discards the scratch buffer.");
+                ui.heading("Discard editing session?");
+                ui.label("Closing discards in-memory edits. Saving is not yet available.");
                 ui.horizontal(|ui| {
                     if ui.button("Keep editing").clicked() {
                         self.confirm_close = false;

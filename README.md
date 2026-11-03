@@ -2,9 +2,9 @@
 
 A Rust desktop text and code editor. Features are separated into a Cargo workspace, with extensions provided through dynamically loaded libraries.
 
-Current status: **M0 accepted with maintainer-approved evidence exceptions on 2026-11-03; M1 not started**. The native desktop, editing core, C ABI/SDK, dynamic plugin host, text-tools extension, and development tooling are runnable. Microsoft Pinyin, native 100%/150%/200% scaling and input-to-present tests are passed by maintainer attestation; their original records were not retained. Detailed native/display results are not independently reproducible from that confirmation. Known font/layout limits remain documented.
+Current status: **M0 accepted with maintainer-approved evidence exceptions on 2026-11-03; M1 in progress**. The native desktop, editing core, C ABI/SDK, dynamic plugin host, text-tools extension, and development tooling are runnable. Microsoft Pinyin, native 100%/150%/200% scaling and input-to-present tests are passed by maintainer attestation; their original records were not retained. Detailed native/display results are not independently reproducible from that confirmation. Known font/layout limits remain documented.
 
-The [November 3 sign-off and revalidation](docs/acceptance/M0_2026-11-03.md) separates that acceptance decision from archived evidence: 42 local Windows Rust tests and 4 Python tests passed, native 125% multiline Notepad clipboard/shortcut/close checks passed, and 50 release idle working-set samples peaked at 149.7070 MiB. [Main CI at `c65c271`](https://github.com/ananwanan/RustEditor/actions/runs/41481683607) passed on Windows and Ubuntu after the LF checkout fix. The [historical M0 record](docs/acceptance/M0.md) is preserved. M1 is unblocked; no later milestone features are claimed.
+The [November 3 sign-off and revalidation](docs/acceptance/M0_2026-11-03.md) separates that acceptance decision from archived evidence: 42 local Windows Rust tests and 4 Python tests passed, native 125% multiline Notepad clipboard/shortcut/close checks passed, and 50 release idle working-set samples peaked at 149.7070 MiB. [Main CI at `c65c271`](https://github.com/ananwanan/RustEditor/actions/runs/41481683607) passed on Windows and Ubuntu after the LF checkout fix. The [historical M0 record](docs/acceptance/M0.md) is preserved. The [M1 acceptance record](docs/acceptance/M1.md) tracks bounded UTF-8 opening and the remaining editing gates.
 
 - [Architecture, technology choices, and workspace](docs/ARCHITECTURE.md)
 - [Dynamic library plugin protocol](docs/PLUGIN_ABI.md)
@@ -12,7 +12,7 @@ The [November 3 sign-off and revalidation](docs/acceptance/M0_2026-11-03.md) sep
 
 Initial target: Windows 10/11 x64, followed by Linux and macOS. The application runs as a standalone desktop program without a WebView. It independently implements a similar editing experience and does not promise binary compatibility with Notepad++ plugins.
 
-## Run the M0 preview
+## Run the desktop preview
 
 Install Rust using [rustup](https://rustup.rs/). The project follows the **Rust stable channel** rather than pinning a specific compiler version. Use the following `rust-toolchain.toml` configuration to select stable Rust with rustfmt and clippy:
 
@@ -34,7 +34,13 @@ cargo run --locked -p rusteditor-desktop
 
 Select text and run **Plugins → Uppercase selection**, **Run command** in the Extensions panel, or **Ctrl+Shift+U**. The example extension is a separately built native library, not linked into the desktop. Its transaction preserves Chinese/emoji and supports Unicode case expansion such as `straße` → `STRASSE`. Ctrl+Z undoes; Ctrl+Y or Ctrl+Shift+Z redoes. Clipboard shortcuts are handled by the native GUI integration.
 
-The editor is currently a **temporary scratch buffer**: no file opening/saving, tabs, encoding conversion, recovery, or large-file mode yet. Modified scratch text requires a discard confirmation before closing. Documents are limited to 4 MiB; undo retains at most 256 transactions and 8 MiB of text deltas. The core-driven editor-view uses extended grapheme boundaries for horizontal movement, selections, hit testing, and deletion. IME preedit remains a presentation overlay until one commit transaction; the acceptance record distinguishes archived native observations from maintainer-attested passes.
+Start with an existing file from the repository root.
+
+```powershell
+cargo run --locked -p rusteditor-desktop -- --open ".\tests\fixtures\probe.rs"
+```
+
+The editor opens one UTF-8 file without a BOM and preserves LF and CRLF bytes on load. Read-only and empty files are supported. The toolbar shows the filename and **Read from disk · Saving not yet available**. Edits are temporary. Without `--open`, the editor starts with the scratch preview. Closing an editing session after an edit requires discard confirmation, even after undo. Saving, tabs, encoding conversion, recovery, and large-file mode are pending. Documents are limited to 4 MiB; undo retains at most 256 transactions and 8 MiB of text deltas. The core-driven editor-view uses extended grapheme boundaries for horizontal movement, selections, hit testing, and deletion. IME preedit remains a presentation overlay until one commit transaction; the acceptance record distinguishes archived native observations from maintainer-attested passes.
 
 Chinese glyphs use an installed system font (Microsoft YaHei on Windows, Noto Sans CJK on Linux, PingFang on macOS). Set `RUSTEDITOR_FONT` to an outline TTF/TTC/OTF path if detection fails. Emoji fallback tries Segoe UI Emoji on Windows and Noto Emoji on Linux; `RUSTEDITOR_EMOJI_FONT` selects an explicit font. Fonts are size-bounded, parsed, and checked for representative outline glyphs before registration; invalid or bitmap-only fonts produce diagnostics and fall back safely. No additional font files are bundled. Emoji render as monochrome glyphs; color and ZWJ ligature shaping are not implemented. Complete platform/font coverage remains follow-up validation beyond the documented M0 prototype limits.
 
@@ -44,7 +50,7 @@ cargo run --locked -p rusteditor-desktop -- --no-plugins --empty
 cargo run --locked -p rusteditor-desktop -- --plugin-dir /absolute/trusted/plugins
 ```
 
-Use `--empty` to start an empty scratch buffer for GUI measurements. It cannot be combined with the headless `--smoke-test`, which uses a fixed test fixture. The [Windows performance protocol](tests/perf/README.md) provides a real-process memory harness and deterministic UTF-8 workloads. Window discovery timing is diagnostic; editable startup and input-to-present latency require separate presentation evidence.
+Use `--empty` to start an empty scratch buffer for GUI measurements. `--open` can be supplied once and is incompatible with `--empty` and `--smoke-test`. The headless smoke test uses a fixed fixture. The [Windows performance protocol](tests/perf/README.md) provides a real-process memory harness and deterministic UTF-8 workloads. Window discovery timing is diagnostic; editable startup and input-to-present latency require separate presentation evidence.
 
 The experimental plugin SDK targets the current version. Older SDK compatibility is not required; rebuild plugins when the SDK/ABI changes. Version, table-size, capability, and lifecycle checks remain mandatory.
 

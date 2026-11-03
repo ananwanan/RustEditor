@@ -1,6 +1,6 @@
 # Architecture Plan
 
-Date: 2026-10-28; acceptance decision updated 2026-11-03. The M0 prototype implements the desktop/core/view/api/sdk/host/text-tools/xtask path and is **accepted with maintainer-approved evidence exceptions**. The [sign-off](acceptance/M0_2026-11-03.md) retains eframe/egui 0.33.3 and the current experimental C ABI for M1, distinguishing archived results from maintainer-attested unarchived tests. M1 is unblocked, not started; later workspace members below remain plans. Locked dependencies and documented prototype limits remain in force.
+Date: 2026-10-28; acceptance decision updated 2026-11-03. The M0 prototype implements the desktop/core/view/api/sdk/host/text-tools/xtask path and is **accepted with maintainer-approved evidence exceptions**. The [sign-off](acceptance/M0_2026-11-03.md) retains eframe/egui 0.33.3 and the current experimental C ABI for M1, distinguishing archived results from maintainer-attested unarchived tests. M1 is in progress. The [M1 acceptance record](acceptance/M1.md) tracks the implemented file-open slice and its validation. Locked dependencies and documented prototype limits remain in force.
 
 ## M0 Implementation Decisions
 
@@ -16,6 +16,12 @@ Date: 2026-10-28; acceptance decision updated 2026-11-03. The M0 prototype imple
 - The experimental SDK/ABI targets the current version; older SDK compatibility and historical fixtures are not required. ABI safety checks remain in force. Automated tests establish the scoped core/DLL behavior, not native GUI, presented-frame budgets, safe file saving or release support. Maintainer-attested GUI/performance acceptance and directly measured evidence are recorded separately in the sign-off. Ubuntu/Windows DLL/core CI and a Linux X11 window smoke pass; font limitations remain documented.
 - The [Windows performance protocol and memory harness](../tests/perf/README.md) record reproducible workloads and separate resident process memory from presentation metrics. `--no-plugins --empty` starts an actual empty scratch buffer for measurement. November 3 release sampling peaked at 149.7070 MiB working set across 50 samples. A discovered window handle is only a diagnostic; archived correlated editable-frame startup and latency samples remain unavailable despite acceptance sign-off. No Core timer or CPU frame duration substitutes for display evidence.
 
+## M1.1 File Opening
+
+The desktop reads the startup path before it creates the native window or loads plugins. The file I/O crate uses a read-only file handle and reads at most the core document cap plus one byte, even when the file grows after its size check. It validates the bytes before transferring the resulting String into the core Document. The desktop shares that Document with the existing view and plugin host. The toolbar retains only the display filename.
+
+The synchronous startup read is bounded in bytes and runs before an interactive UI exists. File operations in a running editor will use the background task model below. Close confirmation conservatively protects any session with a text transaction, including one that has undone edits back to its initial contents. Saved baselines and snapshot completion belong to M1.2.
+
 ## Product Scope
 
 Support everyday text, log, and code editing: multiple tabs, line numbers, a status bar, find and replace, syntax highlighting, encoding conversion, session recovery, and plugins. Priorities are reliable Chinese input, safe file saving, startup speed, and responsive editing.
@@ -24,7 +30,7 @@ The first usable release includes explicit open/save policies for UTF-8, UTF-8 B
 
 ## Workspace Responsibilities
 
-These are target directories to create progressively by milestone. The Cargo workspace defines build and code boundaries. Only extensions marked `cdylib` are loaded at runtime; other crates are compiled and linked into the host.
+The workspace grows progressively by milestone. The Cargo workspace defines build and code boundaries. Only extensions marked `cdylib` are loaded at runtime; other crates are compiled and linked into the host.
 
 | Path / package | Artifact | Responsibility |
 |---|---|---|
@@ -44,7 +50,7 @@ These are target directories to create progressively by milestone. The Cargo wor
 
 Dependency direction: desktop → view/core/file-io/commands/search/syntax/settings/plugin-host; view → core; file-io/search/syntax → core; plugin-host → plugin-api + commands/core; plugin-sdk → plugin-api; plugins → plugin-sdk. The core must not depend on the UI or plugins. Dependency cycles are prohibited.
 
-The M0 dependency audit with `cargo metadata --locked --no-deps --format-version 1` confirms eight implemented members: core and plugin-api have no dependencies; view depends on core and egui; SDK depends on plugin-api; host depends on core, plugin-api, and loading/manifest libraries; text-tools depends on SDK. Desktop assembles view/core/host and does not link text-tools. The command registry remains inside plugin-host until its planned extraction. This validation adds no ABI compatibility layer, hot unloading, file I/O, tabs, or other M1 implementation.
+The M0 dependency audit with `cargo metadata --locked --no-deps --format-version 1` confirms eight implemented members: core and plugin-api have no dependencies; view depends on core and egui; SDK depends on plugin-api; host depends on core, plugin-api, and loading/manifest libraries; text-tools depends on SDK. Desktop assembles view/core/host and does not link text-tools. The command registry remains inside plugin-host until its planned extraction. M1.1 adds a ninth member, file-io, which depends only on editor-core. Desktop calls it during startup.
 
 Do not turn every crate into a dynamic library. Frequent internal operations involving documents, layout, and input continue to use Rust types. Extension boundaries use a narrow C ABI. Built-in search supplies baseline functionality, while plugins provide replaceable extension commands so startup does not require third-party DLLs.
 
