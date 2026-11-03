@@ -1,6 +1,6 @@
 # Development Roadmap and Acceptance Criteria
 
-M0 is **accepted with maintainer-approved evidence exceptions as of 2026-11-03**. M1 is unblocked; M1–M6 have not started. The [sign-off and Windows revalidation](acceptance/M0_2026-11-03.md) records the maintainer's confirmation that the missing Pinyin/native-DPI/input-to-present tests were performed and should pass despite unretained records. It separately retains 42 local Rust tests, 4 Python tests, native 125% clipboard/shortcut/close observations, actual release memory samples and [green Windows/Ubuntu CI](https://github.com/ananwanan/RustEditor/actions/runs/41481683607). No missing numerical or per-scenario results are invented. eframe/egui 0.33.3 and the current experimental C ABI are retained for M1 with documented font, full-layout and memory limits. Older SDK compatibility is not required. Estimates below are rough figures for one full-time developer, not delivery commitments.
+M0 is **accepted with maintainer-approved evidence exceptions as of 2026-11-03**. M1 is in progress. See the [M1 acceptance record](acceptance/M1.md) for M1.1 results. M2–M6 have not started. The [sign-off and Windows revalidation](acceptance/M0_2026-11-03.md) records the maintainer's confirmation that the missing Pinyin/native-DPI/input-to-present tests were performed and should pass despite unretained records. It separately retains 42 local Rust tests, 4 Python tests, native 125% clipboard/shortcut/close observations, actual release memory samples and [green Windows/Ubuntu CI](https://github.com/ananwanan/RustEditor/actions/runs/41481683607). No missing numerical or per-scenario results are invented. eframe/egui 0.33.3 and the current experimental C ABI are retained for M1 with documented font, full-layout and memory limits. Older SDK compatibility is not required. Estimates below are rough figures for one full-time developer, not delivery commitments.
 
 | Milestone | Estimate | Deliverables and completion criteria |
 |---|---|---|
@@ -16,7 +16,7 @@ Dependencies: M0 → M1 → M2 → M3 → M4 → M5 → M6. Dynamic loading is e
 
 ## M1 Implementation Plan (Approved Sequence)
 
-**Planning decision (2026-11-03):** Start M1 with bounded, single-file UTF-8 opening, then reliable saving and modified-state semantics, multi-document tabs, daily editing UI, and full acceptance. This section is the agreed development sequence, **not evidence that M1 implementation has started or passed**. Preserve the existing M0 core-driven view, Unicode/grapheme behavior, undo/redo, and native plugin/ABI tests. The M0 `String` document cap remains 4 MiB; a Rope migration, large-file mode, recovery, and non-UTF-8 encoding conversion are not prerequisites for M1.
+**Planning decision (2026-11-03):** Start M1 with bounded, single-file UTF-8 opening, then reliable saving and modified-state semantics, multi-document tabs, daily editing UI, and full acceptance. The [M1 acceptance record](acceptance/M1.md) tracks implementation and verification against this sequence. Preserve the existing M0 core-driven view, Unicode/grapheme behavior, undo/redo, and native plugin/ABI tests. The M0 `String` document cap remains 4 MiB; a Rope migration, large-file mode, recovery, and non-UTF-8 encoding conversion are not prerequisites for M1.
 
 | Subtask | Scope | Exit gate |
 |---|---|---|
@@ -36,7 +36,7 @@ Dependencies: M0 → M1 → M2 → M3 → M4 → M5 → M6. Dynamic loading is e
 4. Update `apps/desktop/src/view.rs` to show the loaded filename and clearly state that disk saving is not yet available. Continue to use the authoritative core `Document` and existing `EditorView` for editing; do not add a second editable `String`, duplicate undo history, a file picker or tabs. Keep the existing protective close confirmation, but do **not** equate `revision > 1` with proper saved/dirty semantics: revision increases on undo/redo, so M1.2 must introduce explicit save state.
 5. Add unit tests in the file I/O crate for empty, UTF-8 Unicode, LF/CRLF byte fidelity, read-only input, invalid UTF-8, unsupported BOM, nonexistent input and the exact 4 MiB boundary. Exercise the real Windows GUI with an existing Rust fixture; verify editor edits, undo/redo and the existing plugin pathway. Update `README.md`, this roadmap and a new `docs/acceptance/M1.md` with **actual** test results only when implementation exists; keep the milestone marked in progress until all M1 gates pass.
 
-**Expected implementation paths:** `Cargo.toml`, `Cargo.lock`, `crates/file-io/{Cargo.toml,src/lib.rs}`, `apps/desktop/{Cargo.toml,src/main.rs,src/view.rs}`; documentation: `README.md`, `docs/ARCHITECTURE.md`, `docs/ROADMAP.md`, and `docs/acceptance/M1.md` (to be created during implementation). No plugin ABI change is required.
+**Implementation paths:** `Cargo.toml`, `Cargo.lock`, `crates/file-io/{Cargo.toml,src/lib.rs}`, `apps/desktop/{Cargo.toml,src/main.rs,src/view.rs}`; documentation: `README.md`, `docs/ARCHITECTURE.md`, `docs/ROADMAP.md`, and `docs/acceptance/M1.md`. No plugin ABI change is required.
 
 **Deliberate M1.1 exclusions:** Save/Save As, file dialogs and Ctrl+O; tabs and line numbers; UTF-8 BOM, UTF-16 and GBK conversion (M2); external-change conflict handling and recovery (M2); large-file mode (M5). Do not change `eframe/egui` or migrate the core to Rope in this slice.
 
@@ -49,14 +49,9 @@ Dependencies: M0 → M1 → M2 → M3 → M4 → M5 → M6. Dynamic loading is e
 
 ### Local development and validation commands
 
-Use the existing `cargo xtask` alias from `.cargo/config.toml` and the repository root. These are **commands to run after implementing M1.1**, not claims of tests already executed. The package-specific test will become available only after the new crate has been added.
+Use the existing `cargo xtask` alias from `.cargo/config.toml` and the repository root. The [acceptance record](acceptance/M1.md) lists the actual results for these commands.
 
 ```powershell
-git switch main
-git pull --ff-only origin main
-git switch -c feat/m1-utf8-open
-cargo xtask verify                     # Pre-change M0 baseline
-# Implement M1.1
 cargo fmt --all -- --check
 cargo clippy --workspace --all-targets --locked -- -D warnings
 cargo test -p rusteditor-file-io --locked
@@ -67,7 +62,7 @@ cargo run --locked -p rusteditor-desktop -- --no-plugins --open ".\tests\fixture
 git diff --check
 ```
 
-For the Windows GUI acceptance, open the provided Rust fixture and exercise Unicode edits, undo/redo, close confirmation and plugin behavior separately with staged plugins. Generate invalid-UTF-8, empty, LF/CRLF, read-only and >4 MiB test files under ignored `target/` for rejection/boundary checks. Record the results; do not commit generated test artifacts. Run the existing main-push/PR CI on Windows and Ubuntu. Feature work should ordinarily be reviewed on `feat/m1-utf8-open`; this planning-document update does not itself start M1 implementation.
+For the Windows GUI acceptance, open the provided Rust fixture and exercise Unicode edits, undo/redo, close confirmation and plugin behavior separately with staged plugins. Generate invalid-UTF-8, empty, LF/CRLF, read-only and >4 MiB test files under ignored `target/` for rejection/boundary checks. Record the results; do not commit generated test artifacts. Run the existing main-push/PR CI on Windows and Ubuntu. Review the feature on `feat/m1-utf8-open`.
 
 ## Performance Budgets (to Calibrate in M0/M5)
 
@@ -83,7 +78,7 @@ Use a recorded Windows 11 x64 test machine with at least four CPU cores, 16GB RA
 
 Measure end-to-end latency from input events to frame presentation. Core operation timing alone does not represent the user experience. Record Chinese, emoji, CRLF, GBK, UTF-16, long-line, and repeated-replacement workloads separately. If a budget is missed, record the cause and fallback behavior rather than silently changing acceptance criteria.
 
-Use the [M0 Windows performance protocol](../tests/perf/README.md) for reproducible empty-buffer memory sampling, warm/cold startup capture, and a precisely sized 1 MiB Unicode workload. The harness runs the built GUI with `--no-plugins --empty` and retains raw process memory and launch-to-window observations. Window discovery is not editable-state startup or frame presentation and must not be compared with the startup budget. The [November 3 acceptance record](acceptance/M0_2026-11-03.md) owns the actual memory measurements and hardware qualifications. Native/display acceptance includes a maintainer-approved evidence exception; archived correlated startup/latency samples remain unavailable. The numerical budgets above are unchanged and are not independently demonstrated by attestation. M0 still has no file opening, GBK/UTF-16 decoding, or 10/100 MiB modes; those scenarios remain later milestone work.
+Use the [M0 Windows performance protocol](../tests/perf/README.md) for reproducible empty-buffer memory sampling, warm/cold startup capture, and a precisely sized 1 MiB Unicode workload. The harness runs the built GUI with `--no-plugins --empty` and retains raw process memory and launch-to-window observations. Window discovery is not editable-state startup or frame presentation and must not be compared with the startup budget. The [November 3 acceptance record](acceptance/M0_2026-11-03.md) owns the actual memory measurements and hardware qualifications. Native/display acceptance includes a maintainer-approved evidence exception; archived correlated startup/latency samples remain unavailable. The numerical budgets above are unchanged and are not independently demonstrated by attestation. M1.1 adds bounded UTF-8 opening. GBK/UTF-16 decoding and 10/100 MiB modes remain later milestone work.
 
 ## Validation Strategy
 

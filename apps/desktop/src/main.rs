@@ -6,10 +6,12 @@ mod native;
 mod view;
 
 use rusteditor_editor_core::{Document, DocumentId, Selection};
+use rusteditor_file_io::open_utf8;
 use rusteditor_plugin_host::{PluginHost, SharedDocument};
-use std::{cell::RefCell, path::PathBuf, rc::Rc};
+use std::{cell::RefCell, ffi::OsString, path::PathBuf, rc::Rc};
 
 const UPPERCASE: &str = "org.rusteditor.text-tools.uppercase";
+const SMOKE_TEXT: &str = "before | 你好 straße🙂 e\u{301} | after";
 
 #[derive(Default)]
 struct Options {
@@ -17,11 +19,11 @@ struct Options {
     no_plugins: bool,
     smoke: bool,
     empty: bool,
+    open: Option<PathBuf>,
 }
 
-fn options() -> Result<Option<Options>, String> {
+fn options(mut args: impl Iterator<Item = OsString>) -> Result<Option<Options>, String> {
     let mut result = Options::default();
-    let mut args = std::env::args_os().skip(1);
     while let Some(arg) = args.next() {
         match arg.to_str() {
             Some("--plugin-dir") => {
@@ -32,12 +34,22 @@ fn options() -> Result<Option<Options>, String> {
                     args.next().ok_or("--plugin-dir requires a path")?,
                 ));
             }
+            Some("--open") => {
+                if result.open.is_some() {
+                    return Err("--open may be supplied once".into());
+                }
+                let path = args
+                    .next()
+                    .filter(|arg| !arg.is_empty() && !arg.as_encoded_bytes().starts_with(b"-"))
+                    .ok_or("--open requires a path (prefix dash-leading names with ./)")?;
+                result.open = Some(PathBuf::from(path));
+            }
             Some("--no-plugins") => result.no_plugins = true,
             Some("--smoke-test") => result.smoke = true,
             Some("--empty") => result.empty = true,
             Some("--help" | "-h") => {
                 println!(
-                    "RustEditor M0\n\n  --plugin-dir PATH  Enable trusted native plugins in PATH at startup\n  --no-plugins       Start without loading any plugins\n  --smoke-test       Verify the core/host path without opening a window\n  --empty            Open an empty scratch buffer (for GUI validation)\n\nDefault: plugins next to the executable. Native code has host-process privileges.\nScratch text is temporary; file opening and saving arrive in M1."
+                    "RustEditor\n\n  --plugin-dir PATH  Enable trusted native plugins in PATH at startup\n  --no-plugins       Start without loading any plugins\n  --smoke-test       Verify the core/host path without opening a window\n  --empty            Open an empty scratch buffer (for GUI validation)\n  --open PATH        Open a UTF-8 file without BOM (up to 4 MiB)\n\n--open cannot be combined with --empty or --smoke-test. Saving is not yet available.\nDefault: plugins next to the executable. Native code has host-process privileges."
                 );
                 return Ok(None);
             }
@@ -46,6 +58,9 @@ fn options() -> Result<Option<Options>, String> {
     }
     if result.no_plugins && result.plugin_dir.is_some() {
         return Err("choose either --no-plugins or --plugin-dir".into());
+    }
+    if result.open.is_some() && (result.empty || result.smoke) {
+        return Err("--open cannot be combined with --empty or --smoke-test".into());
     }
     if result.empty && result.smoke {
         return Err("--empty requires a GUI run; --smoke-test uses its fixed fixture".into());
@@ -60,16 +75,17 @@ fn main() {
     }
 }
 
-fn run() -> Result<(), String> {
-    let Some(options) = options()? else {
-        return Ok(());
-    };
+fn initial_document(options: &Options) -> Result<Document, String> {
+    if let Some(path) = &options.open {
+        let text = open_utf8(path).map_err(|error| format!("{}: {error}", path.display()))?;
+        return Document::new(DocumentId(1), text).map_err(|error| error.to_string());
+    }
     let text = if options.smoke {
-        "before | 你好 straße🙂 e\u{301} | after"
+        SMOKE_TEXT
     } else if options.empty {
         ""
     } else {
-        "Hello, RustEditor! 你好，世界！ straße 👩‍💻 e\u{301}\n\nSelect text, then use Plugins → Uppercase selection (Ctrl+Shift+U).\n\nThis M0 scratch buffer is temporary. File opening and saving arrive in M1.\n"
+        "Hello, RustEditor! 你好，世界！ straße 👩‍💻 e\u{301}\n\nSelect text, then use Plugins → Uppercase selection (Ctrl+Shift+U).\n\nThis scratch buffer is temporary. Start with --open PATH to open a file.\n"
     };
     let mut document = Document::new(DocumentId(1), text).map_err(|e| e.to_string())?;
     let start = if options.smoke {
@@ -88,6 +104,14 @@ fn run() -> Result<(), String> {
             head: end,
         })
         .map_err(|e| e.to_string())?;
+    Ok(document)
+}
+
+fn run() -> Result<(), String> {
+    let Some(options) = options(std::env::args_os().skip(1))? else {
+        return Ok(());
+    };
+    let document = initial_document(&options)?;
     let document: SharedDocument = Rc::new(RefCell::new(document));
     let mut host = PluginHost::new(document.clone());
     let explicit_dir = options.plugin_dir.is_some();
@@ -123,7 +147,7 @@ fn run() -> Result<(), String> {
                 return Err("dynamic selection transformation failed".into());
             }
             doc.undo().map_err(|e| e.to_string())?;
-            if doc.text() != text {
+            if doc.text() != SMOKE_TEXT {
                 return Err("plugin transaction undo failed".into());
             }
             doc.redo().map_err(|e| e.to_string())?;
@@ -138,6 +162,11 @@ fn run() -> Result<(), String> {
         host.shutdown();
         return Ok(());
     }
+    let filename = options
+        .open
+        .as_deref()
+        .and_then(std::path::Path::file_name)
+        .map(|name| name.to_string_lossy().into_owned());
     let native = eframe::NativeOptions {
         viewport: eframe::egui::ViewportBuilder::default()
             .with_inner_size([1120.0, 760.0])
@@ -146,7 +175,7 @@ fn run() -> Result<(), String> {
         ..Default::default()
     };
     eframe::run_native(
-        "RustEditor · M0",
+        "RustEditor",
         native,
         Box::new(move |cc| {
             Ok(Box::new(view::EditorApp::new(
@@ -154,8 +183,69 @@ fn run() -> Result<(), String> {
                 document,
                 host,
                 diagnostics,
+                filename,
             )))
         }),
     )
     .map_err(|e| e.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn open_rejects_conflicting_or_incomplete_arguments() {
+        for args in [
+            &["--open", "file", "--empty"][..],
+            &["--smoke-test", "--open", "file"],
+            &["--open", "file", "--open", "other"],
+            &["--open"],
+            &["--open", "--no-plugins"],
+            &["--open", ""],
+        ] {
+            assert!(
+                options(args.iter().map(OsString::from)).is_err(),
+                "{args:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn open_accepts_path_with_spaces_and_either_plugin_mode() {
+        let path = "some directory/中文.rs";
+        for plugin_options in [&["--no-plugins"][..], &["--plugin-dir", "trusted"]] {
+            let options = options(
+                ["--open", path]
+                    .into_iter()
+                    .chain(plugin_options.iter().copied())
+                    .map(OsString::from),
+            )
+            .unwrap()
+            .unwrap();
+            assert_eq!(options.open, Some(PathBuf::from(path)));
+            assert_eq!(options.no_plugins, plugin_options == ["--no-plugins"]);
+            assert_eq!(options.plugin_dir.is_some(), !options.no_plugins);
+        }
+    }
+
+    #[test]
+    fn fixture_opens_in_the_core_and_retains_edit_history() {
+        let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures/probe.rs");
+        let original = std::fs::read(&path).unwrap();
+        let mut doc = initial_document(&Options {
+            open: Some(path.clone()),
+            ..Options::default()
+        })
+        .unwrap();
+        assert_eq!(doc.text().as_bytes(), original);
+        assert_eq!(doc.selection(), Selection::default());
+        doc.replace(0..0, "你好🙂 e\u{301}").unwrap();
+        assert!(doc.text().starts_with("你好🙂 e\u{301}"));
+        assert!(doc.undo().unwrap());
+        assert_eq!(doc.text().as_bytes(), original);
+        assert!(doc.redo().unwrap());
+        assert!(doc.text().starts_with("你好🙂 e\u{301}"));
+        assert_eq!(std::fs::read(path).unwrap(), original);
+    }
 }

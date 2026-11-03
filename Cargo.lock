@@ -1845,6 +1845,7 @@ dependencies = [
  "eframe",
  "rusteditor-editor-core",
  "rusteditor-editor-view",
+ "rusteditor-file-io",
  "rusteditor-plugin-host",
 ]
 
@@ -1859,6 +1860,13 @@ dependencies = [
  "egui",
  "rusteditor-editor-core",
  "unicode-segmentation",
+]
+
+[[package]]
+name = "rusteditor-file-io"
+version = "0.1.0"
+dependencies = [
+ "rusteditor-editor-core",
 ]
 
 [[package]]
