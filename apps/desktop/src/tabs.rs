@@ -265,7 +265,7 @@ impl Workspace {
         }) {
             Ok(path) => {
                 self.open.status = format!("Opened {}", path.display());
-                ctx.send_viewport_cmd(egui::ViewportCommand::IMEAllowed(false));
+                crate::view::cancel_native_ime(ctx);
             }
             Err(error) => self.open.status = format!("Open failed: {error}"),
         }

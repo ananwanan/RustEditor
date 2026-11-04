@@ -1,0 +1,4 @@
+[M0:UNICODE:UI:OK] native X11 clipboard, grapheme movement/deletion/cut, undo/redo; plugins=True
+[M1:WORKFLOW:UI:OK] Open/Edit/Save/Save As/Tab/Close, exact LF/CRLF files, active plugin target; plugins=True
+[M0:UNICODE:UI:OK] native X11 clipboard, grapheme movement/deletion/cut, undo/redo; plugins=False
+[M1:WORKFLOW:UI:OK] Open/Edit/Save/Save As/Tab/Close, exact LF/CRLF files, active plugin target; plugins=False

@@ -4,7 +4,9 @@ M0 is **accepted with maintainer-approved evidence exceptions as of 2026-11-03**
 
 M1.3 now implements independent tabs, DocumentId-routed save completions, and active plugin targeting. Scoped Windows automation and native observations are recorded in [M1.3](acceptance/M1.md#m13-multiple-documents-and-tabs); native composition/DPI and full M1 acceptance remain pending.
 
-M1.4 implements line numbers, active-document status, File/Edit menus and asynchronous in-window Open, preserving the M1.3 save and plugin ownership model. [Scoped M1.4 evidence](acceptance/M1.md#m14-everyday-editing-ui) records Windows automation and native 125% observations. Named-IME composition/candidate placement, the native 100%/150%/200% matrix and the full M1.5 workflow gate remain pending; M1 is not accepted yet.
+M1.4 implements line numbers, active-document status, File/Edit menus and asynchronous in-window Open, preserving the M1.3 save and plugin ownership model. [Scoped M1.4 evidence](acceptance/M1.md#m14-everyday-editing-ui) records Windows automation and native 125% observations. At that checkpoint, named-IME composition/candidate placement, the native 100%/150%/200% matrix and the full M1.5 workflow gate remained pending.
+
+M1.5 validation on 2026-11-05 starts from `codex/m1-everyday-ui` at `5b5bd2f`, independently of main. It fixes native IME remaining disabled after document transitions and records 91 Windows / 92 Linux Rust tests, X11 workflows in both plugin modes, cross-application Unicode clipboard checks, and scoped Microsoft Pinyin observations at native 100%/150%/200%. [M1.5 remains incomplete](acceptance/M1.md#m15-full-acceptance-attempt): wheel-scrolled preedit candidates lag until the next key, the historical first blank plugin window is unresolved, and Windows 10/macOS/fresh remote CI remain unverified.
 
 | Milestone | Estimate | Deliverables and completion criteria |
 |---|---|---|

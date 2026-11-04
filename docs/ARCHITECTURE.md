@@ -1,6 +1,6 @@
 # Architecture Plan
 
-Date: 2026-10-28; acceptance decision updated 2026-11-03. The M0 prototype implements the desktop/core/view/api/sdk/host/text-tools/xtask path and is **accepted with maintainer-approved evidence exceptions**. The [sign-off](acceptance/M0_2026-11-03.md) retains eframe/egui 0.33.3 and the current experimental C ABI for M1, distinguishing archived results from maintainer-attested unarchived tests. M1 is in progress. The [M1 acceptance record](acceptance/M1.md) tracks file opening, safe saving, independent tabs and the M1.4 editing UI, with their scoped validation. Locked dependencies and documented prototype limits remain in force.
+Date: 2026-10-28; acceptance decision updated 2026-11-03. The M0 prototype implements the desktop/core/view/api/sdk/host/text-tools/xtask path and is **accepted with maintainer-approved evidence exceptions**. The [sign-off](acceptance/M0_2026-11-03.md) retains eframe/egui 0.33.3 and the current experimental C ABI for M1, distinguishing archived results from maintainer-attested unarchived tests. M1 is in progress. The [M1 acceptance record](acceptance/M1.md) tracks file opening, safe saving, independent tabs, the M1.4 editing UI and M1.5 native input fixes and outstanding gates. Locked dependencies and documented prototype limits remain in force.
 
 ## M0 Implementation Decisions
 
@@ -52,6 +52,12 @@ The synchronous startup read is bounded in bytes and runs before an interactive 
 - One availability calculation drives File/Edit menus and toolbar actions: New/Open need capacity, Save needs changed contents or a scratch destination, Save As needs an idle active tab, and Undo/Redo need active history. Close retains the existing deferred-save behavior. Application shortcuts and mutation buttons are suppressed during IME frames and modals. Focused-editor Undo/Redo remains in its ordered event stream; menu/toolbar actions and shortcuts outside editor focus use the same core history. Path-entry Enter does not submit during observed IME sessions or their event frames.
 
 No dependency, core transaction, plugin routing or v1.0 wire ABI changes are required. Encoding conversion, search, recovery and large-file modes remain in their roadmap milestones.
+
+## M1.5 Native Input Validation
+
+New/Open/tab activation cancels the departing native IME context and immediately restores it for the arriving editor. In egui-winit 0.33.3, platform output updates IME permission only when its cached `allow_ime` changes. Explicit viewport commands bypass that cache: sending only `IMEAllowed(false)` during a focused-to-focused transition leaves Windows composition disabled while the adapter still caches true. The paired disable/enable commands retain cancellation without leaving that mismatch. Both views still reset their transient sessions and reject delayed commits until fresh IME input; no text, history, revision or plugin ABI moves into the GUI adapter.
+
+A frame regression models the adapter's cached platform output followed by explicit viewport commands across New, tab switching and a real background Open. Removing the re-enable command makes it fail. Native Microsoft Pinyin revalidation confirms immediate composition after each transition. Windows 11 100%/150%/200%, clipboard and workflow observations are scoped in [M1.5 acceptance](acceptance/M1.md#m15-full-acceptance-attempt). Wheel scrolling during preedit can leave the native candidate popup at its prior position until the next composition key; the platform-output geometry tests alone do not establish that the OS popup followed it. This remains an acceptance blocker. A dynamically enlarged normal window can exceed the work area at 200%; maximization restores its complete layout. No toolkit upgrade, Win32 candidate-window override or speculative startup repaint was introduced.
 
 ## Product Scope
 

@@ -5,8 +5,8 @@ use rusteditor_file_io::SaveTarget;
 use rusteditor_plugin_host::PluginHost;
 use std::{cell::RefCell, rc::Rc};
 
-fn frame(app: &mut EditorApp, ctx: &egui::Context, events: Vec<egui::Event>) {
-    let _ = ctx.run(
+fn frame(app: &mut EditorApp, ctx: &egui::Context, events: Vec<egui::Event>) -> egui::FullOutput {
+    ctx.run(
         egui::RawInput {
             screen_rect: Some(egui::Rect::from_min_size(
                 egui::Pos2::ZERO,
@@ -16,7 +16,56 @@ fn frame(app: &mut EditorApp, ctx: &egui::Context, events: Vec<egui::Event>) {
             ..Default::default()
         },
         |ctx| app.update_frame(ctx),
-    );
+    )
+}
+
+#[test]
+fn native_ime_stays_enabled_across_new_switch_and_background_open() {
+    // Model the adapter's cached platform-output update followed by viewport
+    // commands. A focused-to-focused transition leaves the cache true, so a
+    // lone explicit disable would remain in effect on every subsequent frame.
+    let mut cached = false;
+    let mut native = false;
+    let mut observe = |output: egui::FullOutput| {
+        let allow = output.platform_output.ime.is_some();
+        if cached != allow {
+            cached = allow;
+            native = allow;
+        }
+        let mut canceled = false;
+        for command in &output.viewport_output[&egui::ViewportId::ROOT].commands {
+            if let egui::ViewportCommand::IMEAllowed(allowed) = command {
+                native = *allowed;
+                canceled = true;
+            }
+        }
+        if allow || canceled {
+            assert!(
+                native,
+                "a focused editor must retain its native IME context"
+            );
+        }
+    };
+    let mut app = app();
+    let ctx = egui::Context::default();
+    observe(frame(&mut app, &ctx, vec![]));
+    observe(frame(&mut app, &ctx, vec![shortcut(Key::N, false)]));
+    observe(frame(&mut app, &ctx, vec![]));
+    let mut next_tab = shortcut(Key::Tab, false);
+    if let egui::Event::Key { modifiers, .. } = &mut next_tab {
+        modifiers.ctrl = true;
+    }
+    observe(frame(&mut app, &ctx, vec![next_tab]));
+    assert_eq!(app.workspace.active_id(), Some(DocumentId(1)));
+    observe(frame(&mut app, &ctx, vec![]));
+    let path = std::env::temp_dir().join(format!("rusteditor-ime-open-{}.txt", std::process::id()));
+    std::fs::write(&path, "opened").unwrap();
+    app.workspace.start_open(path.clone()).unwrap();
+    app.workspace.open.wait_until_ready();
+    observe(frame(&mut app, &ctx, vec![]));
+    observe(frame(&mut app, &ctx, vec![]));
+    assert_eq!(app.workspace.tabs.len(), 3);
+    std::fs::remove_file(path).unwrap();
 }
 
 fn app() -> EditorApp {

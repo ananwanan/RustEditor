@@ -73,8 +73,13 @@ def run():
         # Let the native clipboard request finish before changing its owner.
         time.sleep(0.15)
 
+    # WSLg can expose both displays. The driver below targets X11, so the child
+    # must not select Wayland and open outside xvfb-run's isolated display.
+    environment = os.environ.copy()
+    environment.pop("WAYLAND_DISPLAY", None)
+    environment.pop("WAYLAND_SOCKET", None)
     with tempfile.TemporaryFile(mode="w+") as log:
-        app = subprocess.Popen([str(args.binary.resolve()), *(["--no-plugins"] if args.no_plugins else [])], cwd=root, stdout=log, stderr=subprocess.STDOUT)
+        app = subprocess.Popen([str(args.binary.resolve()), *(["--no-plugins"] if args.no_plugins else [])], cwd=root, env=environment, stdout=log, stderr=subprocess.STDOUT)
         try:
             deadline = time.monotonic() + 20
             while time.monotonic() < deadline:
@@ -119,6 +124,65 @@ def run():
                 assert wait_for_clipboard_change(value) == cluster
                 assert_editor("LR")
             print("[M0:UNICODE:UI:OK] native X11 clipboard, grapheme movement/deletion/cut, undo/redo; plugins=" + str(not args.no_plugins))
+            with tempfile.TemporaryDirectory(prefix="rusteditor-m1-ui-") as directory:
+                directory = Path(directory)
+                a = directory / "a saved.txt"
+                b = directory / "b CRLF.txt"
+                saved_as = directory / "saved as 中文.txt"
+                alpha = "alpha 你好 straße🙂 e\u0301\nsecond line\n"
+                beta = "beta 世界 straße🙂 e\u0301\r\nsecond line\r\n"
+                b.write_bytes(beta.encode())
+
+                def wait_bytes(path, expected):
+                    deadline = time.monotonic() + 5
+                    while time.monotonic() < deadline:
+                        if path.is_file() and path.read_bytes() == expected.encode():
+                            return
+                        time.sleep(0.02)
+                    raise AssertionError(f"save did not publish expected bytes: {path}")
+
+                def path_action(chord, path):
+                    keys(chord)
+                    clipboard(str(path))
+                    keys("ctrl+a", "ctrl+v", "Return")
+                    # The path dialog hands off to a bounded background job.
+                    time.sleep(0.3)
+
+                paste(alpha)
+                path_action("ctrl+shift+s", a)
+                wait_bytes(a, alpha)
+                path_action("ctrl+o", b)
+                assert_editor(beta)
+                # Disk-opened CRLF remains exact through native copy and saving.
+                expected_beta = beta
+                if not args.no_plugins:
+                    keys("ctrl+shift+u")
+                    assert_editor(beta.upper())
+                    expected_beta = beta.upper()
+                else:
+                    keys("ctrl+End")
+                    xdo("type", "--clearmodifiers", "tail")
+                    expected_beta += "tail"
+                    assert_editor(expected_beta)
+                keys("ctrl+s")
+                wait_bytes(b, expected_beta)
+                keys("ctrl+shift+Tab")
+                assert_editor(alpha)
+                if not args.no_plugins:
+                    keys("ctrl+shift+u")
+                    assert_editor(alpha.upper())
+                    keys("ctrl+z")
+                    assert_editor(alpha)
+                path_action("ctrl+shift+s", saved_as)
+                wait_bytes(saved_as, alpha)
+                assert a.read_bytes() == alpha.encode()
+                keys("ctrl+w")
+                assert_editor(expected_beta)
+                keys("ctrl+w", "ctrl+n")
+                paste("fresh tab 你好🙂")
+                assert_editor("fresh tab 你好🙂")
+                keys("ctrl+z", "ctrl+w")
+                print("[M1:WORKFLOW:UI:OK] Open/Edit/Save/Save As/Tab/Close, exact LF/CRLF files, active plugin target; plugins=" + str(not args.no_plugins))
         finally:
             if app.poll() is None:
                 app.terminate()

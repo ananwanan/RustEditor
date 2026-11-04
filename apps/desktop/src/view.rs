@@ -23,6 +23,15 @@ struct Actions {
     redo: bool,
 }
 
+pub(crate) fn cancel_native_ime(ctx: &egui::Context) {
+    // Viewport commands bypass egui-winit 0.33's cached allow_ime flag.
+    // Leaving the native context disabled while that cache is true prevents
+    // subsequent focused editors from receiving composition events. Cancel the
+    // departing session, then restore the context for the arriving editor.
+    ctx.send_viewport_cmd(egui::ViewportCommand::IMEAllowed(false));
+    ctx.send_viewport_cmd(egui::ViewportCommand::IMEAllowed(true));
+}
+
 impl Actions {
     fn available(workspace: &Workspace, blocked: bool) -> Self {
         let enabled = !blocked && !workspace.closing_all;
@@ -586,12 +595,12 @@ impl EditorApp {
         if let Some(id) = switch_tab
             && self.workspace.active_id() != Some(id)
         {
-            ctx.send_viewport_cmd(egui::ViewportCommand::IMEAllowed(false));
+            cancel_native_ime(ctx);
             self.workspace.activate(id);
             ctx.request_repaint();
         }
         if new_tab {
-            ctx.send_viewport_cmd(egui::ViewportCommand::IMEAllowed(false));
+            cancel_native_ime(ctx);
             if let Err(error) = self.workspace.new_tab()
                 && let Some(tab) = self.workspace.active_mut()
             {

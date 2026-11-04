@@ -1,0 +1,144 @@
+{
+  "schema_version": 1,
+  "record_date_local": "2026-11-05",
+  "timezone": "Asia/Shanghai",
+  "baseline_commit": "5b5bd2f8d190c60bc37e6cb361f052b88684ccc6",
+  "baseline_branch": "codex/m1-everyday-ui",
+  "working_branch": "codex/m1-5-acceptance",
+  "workspace": "C:\\Users\\ananwanan\\.codex\\worktrees\\05ca\\RustEditor",
+  "implementation_was_uncommitted_during_checks": true,
+  "tested_patch_sha256": "f6e8f802439677ea52d17af16da51413935254785cb98390702d782a28ea9880",
+  "tested_patch_paths": [
+    "apps/desktop/src/tabs.rs",
+    "apps/desktop/src/view.rs",
+    "apps/desktop/src/view/tests.rs",
+    "tests/ui/x11_smoke.py"
+  ],
+  "source_file_sha256": {
+    "apps/desktop/src/tabs.rs": "f4636100c17b22249177c3f9d59a90ffa75601e000738a17620c5f44a988100f",
+    "apps/desktop/src/view.rs": "6c44b3b91313d1aefa014257379fb3fe8aba443d94258fb3fe29791e98f1b76b",
+    "apps/desktop/src/view/tests.rs": "c3267b9d36d1c8a4fc0f5438c419c9b85dc6c579c3e228b9f54a8a72948e67e7",
+    "tests/ui/x11_smoke.py": "6f770b0a12131edc9aeec46c6b18967432d9d8c4c76df12f4ed234a7bf96130b"
+  },
+  "binaries_sha256": {
+    "windows_baseline_desktop": "a4939e93da40c230e35220d8774171fb5bc53cfa2d4a5da01b1b9c84e98621b8",
+    "windows_patched_desktop": "8f612e11d0fe6b3ebe203f6b3d7bac539f9315e4ea11480b121cf7327732a660",
+    "windows_text_tools": "526cf647c01e985d380b016adad84dfca6844c09690ff1c8e86ff4ee6b821384",
+    "linux_patched_desktop": "3644d23c25cc47929798183372c14f2385fdb6d1d27e27d561f78c3e2beb3091",
+    "linux_text_tools": "9969bb0a61150ca99cfe2258f421676cb22c90221f95fb537e8f98dcfadbc641"
+  },
+  "windows": {
+    "os": "Windows 11 Pro 10.0.26300 x64",
+    "rustc": "1.99.1 (58cf8f9c3 2026-10-13)",
+    "cargo": "1.99.1 (5f94df478 2026-08-27)",
+    "target": "x86_64-pc-windows-msvc",
+    "profile": "debug",
+    "cpu": "Intel Core i5-12600KF",
+    "physical_memory_bytes": 34192097280,
+    "graphics": [
+      "NVIDIA GeForce RTX 4060 Ti",
+      "OrayIddDriver Device"
+    ],
+    "display_pixels": [
+      2560,
+      1440
+    ],
+    "fonts": [
+      "Microsoft YaHei",
+      "Segoe UI Emoji outline fallback"
+    ],
+    "ime": {
+      "name": "Microsoft Pinyin",
+      "tip": "0804:{81D4E9C9-1D3B-41BC-9E6C-4B40BF79E35E}{FA550B04-5AD7-411F-A5AC-CA038EC515D7}",
+      "chs_ime_file_version": "10.0.26100.9818 (WinBuild.160101.0800)",
+      "identification": "Windows Advanced keyboard settings, Get-WinDefaultInputMethodOverride, registered TIP description, native candidate UI"
+    },
+    "clipboard_peer": "Microsoft Windows Notepad 11.2607.14.0",
+    "native_scale_percent": [
+      100,
+      150,
+      200
+    ],
+    "scale_method": "Windows Settings > System > Display > Scale; editor status independently reports each value",
+    "restored_scale_percent": 125,
+    "restored_default_ime": "Sogou Pinyin",
+    "test_editor_processes_remaining": 0
+  },
+  "linux": {
+    "os": "Ubuntu 24.04.5 LTS, WSL2, ext4",
+    "kernel": "6.18.33.2-microsoft-standard-WSL2 x86_64",
+    "rustc": "1.98.1 (48a229cea 2026-09-01)",
+    "cargo": "1.98.1 (797e8a9bc 2026-08-05)",
+    "profile": "debug",
+    "source_root": "/home/ananwanan/rusteditor-m15-05ca",
+    "cargo_target_dir": "/home/ananwanan/rusteditor-m12.nufGxi/target",
+    "gui": "isolated Xvfb with xdotool/xclip/xauth; Wayland variables removed from child environment"
+  },
+  "results": {
+    "windows_verify_exit_code": 0,
+    "windows_rust_tests": 91,
+    "linux_verify_exit_code": 0,
+    "linux_rust_tests": 92,
+    "python_tests_each_platform": 4,
+    "x11_plugin_enabled_exit_code": 0,
+    "x11_no_plugins_exit_code": 0,
+    "negative_control_exit_code": 1,
+    "negative_control_expected": true,
+    "m1_accepted": false
+  },
+  "native_file_checks": {
+    "a LF Chinese filename": {
+      "bytes": 41,
+      "result": "All text uppercased only in A and saved exactly"
+    },
+    "b CRLF.txt": {
+      "bytes": 2243,
+      "result": "Only first line uppercased; all CRLF and remaining rows preserved; Save from close removed only B"
+    },
+    "clipboard saved Chinese filename": {
+      "bytes": 67,
+      "result": "Notepad input preserved except documented native CRLF-to-LF paste normalization"
+    },
+    "ZWJ clipboard": {
+      "utf8_bytes": 15,
+      "graphemes": 1,
+      "result": "Exact woman/skin-tone/ZWJ/laptop sequence cut and pasted into Notepad"
+    },
+    "tracked_fixture_sha256": "634b8b431d5f4553ebe4efa057ba7f26318efe383f392c580597ae2b85cdd827"
+  },
+  "open_gates": [
+    "Candidate window remains at its prior position during wheel scrolling until another preedit key; confirmed at native 100%",
+    "Historical first blank plugin window not reproduced or conclusively explained",
+    "Dynamic 200% normal window can extend below work area; maximization restores full layout",
+    "Windows 10, macOS, physical clean-machine validation and fresh remote CI not run",
+    "Save/open/switch/close concurrency uses controlled completion delivery, not a naturally stalled native disk",
+    "No new presentation latency, power-loss or release claim"
+  ],
+  "evidence_sha256": {
+    "baseline-plugin-first.jpg": "38b6e83843b5c442575df6a19fd6fc3f408e35c97a5d8e547225459a97017dcb",
+    "ime-negative-control.txt": "8eb466473684b04dd2e3b83ceedf3d04a2c13694640b6f5d84af6a2b161f2a15",
+    "linux-final-verify.txt": "98b2f0bcb828753d849a3a032127404f99d3cda0e2c9e08ec0a7ecfcaa72ee9a",
+    "linux-python.txt": "5610bb341ae4df72930d9f88afd8d925eec567770a8ccf6387603ee214544c29",
+    "linux-x11.txt": "a81d7c60ab5503e205f88ed933ae7b77e571d4fc064b8479e55ec2a20d92b421",
+    "native-100-zwj-selection.jpg": "08796eec1f5ed827aab7a2ac7b5153b152d50c93d615f4e6e299d23081470ca3",
+    "native-150-pinyin-preedit.jpg": "67dbc216b64d95b0b666ce8c1a92bf81bd41ea9786b08e43ed6faa9ecff3d2c2",
+    "native-200-gutter-hit.jpg": "02a7d86b87c2f7c0cd782428fd0585904095ee56b93d8be3072899715d13c3f9",
+    "native-200-pinyin-preedit.jpg": "2974185ac949ce31888281bffd984bd0c22ff9dc36678dbe7f0937d0c421b43d",
+    "native-200-save-close.jpg": "913f01901e454196b729d021f90d2bb034655cf4f92cd607d31fb45e18148e1d",
+    "patched-100-new-preedit.jpg": "f3ff9f5ab13b9c5a01c108a7d05d6faaa86ff35db234384e7e285d540d8db23a",
+    "patched-100-scroll-next-preedit.jpg": "9d50b9c4d2c8d414682a1701b52b067e4a15ec284e9fd44bb117d179e48da2c0",
+    "patched-100-visible-composition-scroll.jpg": "fa5fcf226ab8e6c5638ced5a9d172fd4ced3ffa9a05c061a575e09f73d6d5401",
+    "patched-125-no-plugin-preedit.jpg": "92e79396c6d3331fa7da6a987a7f7fd3162e87b6985c4586f3f1b519ff0870cf",
+    "patched-200-open-preedit.jpg": "3b0d3af581f3dd3b4c12add24171d6252b803e363ff66072c7aed0a7e0a2db57",
+    "windows-final-verify.txt": "7faa326db4f71441899db5a76d7dc6dfea381f43d446a4db91c813f6de20eef8",
+    "windows-python.txt": "bf7dcac0b79efbc45b48183e4fb256198febe14d06570821cd04d8f13aca97c8"
+  },
+  "evidence_normalization": {
+    "description": "Archived text logs use LF line endings; output text and test results are unchanged.",
+    "original_windows_log_sha256": {
+      "ime-negative-control.txt": "65d1ddf33a6ec3a6b28444a8f0e1ef66f965e98e247849b5b4972f9f8b04c631",
+      "windows-final-verify.txt": "5c23d3d0f6051c5b87c7b291b804317e7f36bcff1bdbb9b6602f89b161b42f5b",
+      "windows-python.txt": "93d9d365c43cf9fad5d6a171dfa7344002bcb75559e11cccb78f389921ad0385"
+    }
+  }
+}

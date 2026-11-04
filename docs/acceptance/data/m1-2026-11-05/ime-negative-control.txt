@@ -1,0 +1,22 @@
+   Compiling rusteditor-desktop v0.1.0 (C:\Users\ananwanan\.codex\worktrees\05ca\RustEditor\apps\desktop)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.52s
+     Running unittests src\main.rs (target\debug\deps\rusteditor_desktop-7013fb23600cfa9b.exe)
+
+running 1 test
+test view::tests::native_ime_stays_enabled_across_new_switch_and_background_open ... FAILED
+
+failures:
+
+---- view::tests::native_ime_stays_enabled_across_new_switch_and_background_open stdout ----
+
+thread 'view::tests::native_ime_stays_enabled_across_new_switch_and_background_open' (31204) panicked at apps\desktop\src\view\tests.rs:43:13:
+a focused editor must retain its native IME context
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    view::tests::native_ime_stays_enabled_across_new_switch_and_background_open
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 23 filtered out; finished in 0.01s
+
+error: test failed, to rerun pass `-p rusteditor-desktop --bin rusteditor-desktop`
