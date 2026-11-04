@@ -147,7 +147,13 @@ unsafe extern "C" fn snapshot(
         if let Err(status) = output_header(metadata) {
             return status;
         }
-        let Ok(document) = context.document.try_borrow() else {
+        let Ok(active) = context.document.try_borrow() else {
+            return CONFLICT;
+        };
+        let Some(document) = active.as_ref() else {
+            return DISABLED;
+        };
+        let Ok(document) = document.try_borrow() else {
             return CONFLICT;
         };
         if expected != 0 && expected != document.revision().0 {
@@ -201,7 +207,13 @@ unsafe extern "C" fn replace(ptr: *mut c_void, request: *const ReplaceRequest) -
         let Some(head) = start.checked_add(text.len()) else {
             return INVALID_ARGUMENT;
         };
-        let Ok(mut document) = context.document.try_borrow_mut() else {
+        let Ok(active) = context.document.try_borrow() else {
+            return CONFLICT;
+        };
+        let Some(document) = active.as_ref() else {
+            return DISABLED;
+        };
+        let Ok(mut document) = document.try_borrow_mut() else {
             return CONFLICT;
         };
         match document.apply(Transaction {
@@ -259,7 +271,7 @@ mod tests {
             owner: std::thread::current().id(),
             id: "org.rusteditor.probe".into(),
             capabilities: CAP_ALL,
-            document,
+            document: Rc::new(RefCell::new(Some(document))),
             commands: Rc::default(),
             logs: Rc::default(),
             last_error: RefCell::default(),
@@ -357,11 +369,47 @@ mod tests {
             context.mutating.set(true);
             assert_eq!(replace(ptr, &request), CONFLICT);
             context.mutating.set(false);
-            assert_eq!(context.document.borrow().text(), "中🙂");
+            let document = context.document.borrow().as_ref().unwrap().clone();
+            assert_eq!(document.borrow().text(), "中🙂");
             assert_eq!(replace(ptr, &request), OK);
-            assert_eq!(context.document.borrow().text(), "好🙂");
+            assert_eq!(document.borrow().text(), "好🙂");
             assert_eq!(replace(ptr, &request), STALE_REVISION);
         }
+    }
+
+    #[test]
+    fn replacement_from_a_previous_tab_is_rejected_even_when_revisions_match() {
+        let mut context = context();
+        let ptr = (&mut *context as *mut Context).cast();
+        let original = context.document.borrow().as_ref().unwrap().clone();
+        let next = Rc::new(RefCell::new(
+            Document::new(DocumentId(2), "second").unwrap(),
+        ));
+        *context.document.borrow_mut() = Some(next.clone());
+        let request = ReplaceRequest {
+            header: AbiHeader::new::<ReplaceRequest>(),
+            document_id: 1,
+            expected_revision: 1,
+            start: 0,
+            end: 0,
+            replacement: Utf8Slice::borrowed("late"),
+        };
+        // SAFETY: The stable context and initialized request live through each call.
+        unsafe {
+            assert_eq!(replace(ptr, &request), INVALID_ARGUMENT);
+            let mut metadata = SelectionSnapshot::default();
+            assert_eq!(snapshot(ptr, 0, OutputBuffer::query(), &mut metadata), OK);
+            assert_eq!(metadata.document_id, 2);
+            *context.document.borrow_mut() = None;
+            assert_eq!(replace(ptr, &request), DISABLED);
+            assert_eq!(
+                snapshot(ptr, 0, OutputBuffer::query(), &mut metadata),
+                DISABLED
+            );
+        }
+        assert_eq!(next.borrow().text(), "second");
+        assert!(!next.borrow().can_undo());
+        assert_eq!(original.borrow().text(), "中🙂");
     }
 
     #[test]

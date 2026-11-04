@@ -4,6 +4,7 @@
 mod fonts;
 mod native;
 mod save;
+mod tabs;
 mod view;
 
 use rusteditor_editor_core::{Document, DocumentId, Selection};
@@ -20,7 +21,7 @@ struct Options {
     no_plugins: bool,
     smoke: bool,
     empty: bool,
-    open: Option<PathBuf>,
+    open: Vec<PathBuf>,
 }
 
 fn options(mut args: impl Iterator<Item = OsString>) -> Result<Option<Options>, String> {
@@ -36,21 +37,21 @@ fn options(mut args: impl Iterator<Item = OsString>) -> Result<Option<Options>, 
                 ));
             }
             Some("--open") => {
-                if result.open.is_some() {
-                    return Err("--open may be supplied once".into());
+                if result.open.len() >= tabs::MAX_TABS {
+                    return Err(format!("at most {} files can be open", tabs::MAX_TABS));
                 }
                 let path = args
                     .next()
                     .filter(|arg| !arg.is_empty() && !arg.as_encoded_bytes().starts_with(b"-"))
                     .ok_or("--open requires a path (prefix dash-leading names with ./)")?;
-                result.open = Some(PathBuf::from(path));
+                result.open.push(PathBuf::from(path));
             }
             Some("--no-plugins") => result.no_plugins = true,
             Some("--smoke-test") => result.smoke = true,
             Some("--empty") => result.empty = true,
             Some("--help" | "-h") => {
                 println!(
-                    "RustEditor\n\n  --plugin-dir PATH  Enable trusted native plugins in PATH at startup\n  --no-plugins       Start without loading any plugins\n  --smoke-test       Verify the core/host path without opening a window\n  --empty            Open an empty scratch buffer (for GUI validation)\n  --open PATH        Open a UTF-8 file without BOM (up to 4 MiB)\n\n--open cannot be combined with --empty or --smoke-test.\nDefault: plugins next to the executable. Native code has host-process privileges."
+                    "RustEditor\n\n  --plugin-dir PATH  Enable trusted native plugins in PATH at startup\n  --no-plugins       Start without loading any plugins\n  --smoke-test       Verify the core/host path without opening a window\n  --empty            Open an empty scratch buffer (for GUI validation)\n  --open PATH        Open a UTF-8 tab without BOM (up to 4 MiB); repeat for more tabs\n\n--open cannot be combined with --empty or --smoke-test. At most 32 tabs.\nDefault: plugins next to the executable. Native code has host-process privileges."
                 );
                 return Ok(None);
             }
@@ -60,7 +61,7 @@ fn options(mut args: impl Iterator<Item = OsString>) -> Result<Option<Options>, 
     if result.no_plugins && result.plugin_dir.is_some() {
         return Err("choose either --no-plugins or --plugin-dir".into());
     }
-    if result.open.is_some() && (result.empty || result.smoke) {
+    if !result.open.is_empty() && (result.empty || result.smoke) {
         return Err("--open cannot be combined with --empty or --smoke-test".into());
     }
     if result.empty && result.smoke {
@@ -79,15 +80,8 @@ fn main() {
 fn initial_document(
     options: &Options,
 ) -> Result<(Document, Option<save::FileAssociation>), String> {
-    if let Some(path) = &options.open {
-        let path = std::path::absolute(path).map_err(|error| error.to_string())?;
-        let (text, baseline) =
-            open_utf8_for_editing(&path).map_err(|error| format!("{}: {error}", path.display()))?;
-        let document = Document::new(DocumentId(1), text).map_err(|error| error.to_string())?;
-        return Ok((
-            document,
-            Some(save::FileAssociation::new(path, Some(baseline))),
-        ));
+    if let Some(path) = options.open.first() {
+        return open_document(DocumentId(1), path);
     }
     let text = if options.smoke {
         SMOKE_TEXT
@@ -116,12 +110,31 @@ fn initial_document(
     Ok((document, None))
 }
 
+fn open_document(
+    id: DocumentId,
+    path: &std::path::Path,
+) -> Result<(Document, Option<save::FileAssociation>), String> {
+    let path = std::path::absolute(path).map_err(|error| error.to_string())?;
+    let (text, baseline) =
+        open_utf8_for_editing(&path).map_err(|error| format!("{}: {error}", path.display()))?;
+    let document = Document::new(id, text).map_err(|error| error.to_string())?;
+    Ok((
+        document,
+        Some(save::FileAssociation::new(path, Some(baseline))),
+    ))
+}
+
 fn run() -> Result<(), String> {
     let Some(options) = options(std::env::args_os().skip(1))? else {
         return Ok(());
     };
     let (document, association) = initial_document(&options)?;
     let document: SharedDocument = Rc::new(RefCell::new(document));
+    let mut initial_tabs = vec![tabs::Tab::new(document.clone(), association)];
+    for (index, path) in options.open.iter().enumerate().skip(1) {
+        let (document, association) = open_document(DocumentId(index as u64 + 1), path)?;
+        initial_tabs.push(tabs::Tab::new(Rc::new(RefCell::new(document)), association));
+    }
     let mut host = PluginHost::new(document.clone());
     let explicit_dir = options.plugin_dir.is_some();
     let directory = options.plugin_dir.unwrap_or(
@@ -178,18 +191,13 @@ fn run() -> Result<(), String> {
         renderer: eframe::Renderer::Glow,
         ..Default::default()
     };
+    // Tabs and active plugin routing own the documents during the GUI run.
+    drop(document);
+    let workspace = tabs::Workspace::new(initial_tabs, host);
     eframe::run_native(
         "RustEditor",
         native,
-        Box::new(move |cc| {
-            Ok(Box::new(view::EditorApp::new(
-                cc,
-                document,
-                host,
-                diagnostics,
-                association,
-            )))
-        }),
+        Box::new(move |cc| Ok(Box::new(view::EditorApp::new(cc, workspace, diagnostics)))),
     )
     .map_err(|e| e.to_string())
 }
@@ -199,11 +207,29 @@ mod tests {
     use super::*;
 
     #[test]
+    fn repeated_open_paths_are_ordered_and_bounded() {
+        let parsed = options(
+            ["--open", "a.txt", "--open", "b 中文.txt"]
+                .into_iter()
+                .map(OsString::from),
+        )
+        .unwrap()
+        .unwrap();
+        assert_eq!(
+            parsed.open,
+            vec![PathBuf::from("a.txt"), PathBuf::from("b 中文.txt")]
+        );
+        let arguments: Vec<_> = (0..=tabs::MAX_TABS)
+            .flat_map(|_| [OsString::from("--open"), OsString::from("a.txt")])
+            .collect();
+        assert!(options(arguments.into_iter()).is_err());
+    }
+
+    #[test]
     fn open_rejects_conflicting_or_incomplete_arguments() {
         for args in [
             &["--open", "file", "--empty"][..],
             &["--smoke-test", "--open", "file"],
-            &["--open", "file", "--open", "other"],
             &["--open"],
             &["--open", "--no-plugins"],
             &["--open", ""],
@@ -227,7 +253,7 @@ mod tests {
             )
             .unwrap()
             .unwrap();
-            assert_eq!(options.open, Some(PathBuf::from(path)));
+            assert_eq!(options.open, vec![PathBuf::from(path)]);
             assert_eq!(options.no_plugins, plugin_options == ["--no-plugins"]);
             assert_eq!(options.plugin_dir.is_some(), !options.no_plugins);
         }
@@ -238,7 +264,7 @@ mod tests {
         let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures/probe.rs");
         let original = std::fs::read(&path).unwrap();
         let (mut doc, _) = initial_document(&Options {
-            open: Some(path.clone()),
+            open: vec![path.clone()],
             ..Options::default()
         })
         .unwrap();

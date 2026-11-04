@@ -86,6 +86,45 @@ fn ime(event: ImeEvent) -> Event {
 }
 
 #[test]
+fn tab_activation_rejects_late_ime_commits_and_a_fresh_session_commits_once() {
+    let mut h = Harness::new("first");
+    h.frame(vec![
+        ime(ImeEvent::Enabled),
+        ime(ImeEvent::Preedit("ni".into())),
+    ]);
+    assert!(h.view.is_composing());
+    let selection = h.document.selection();
+    h.view.reset_ime();
+    assert!(!h.view.is_composing());
+    let mut other = EditorView::default();
+    other.reset_ime();
+    let original = std::mem::replace(
+        &mut h.document,
+        Document::new(DocumentId(2), "second").unwrap(),
+    );
+    let old_view = std::mem::replace(&mut h.view, other);
+    h.frame(vec![ime(ImeEvent::Commit("你".into()))]);
+    assert_eq!(h.document.text(), "second");
+    assert!(!h.document.can_undo());
+    h.frame(vec![
+        ime(ImeEvent::Enabled),
+        ime(ImeEvent::Preedit("hao".into())),
+        ime(ImeEvent::Commit("好".into())),
+        ime(ImeEvent::Disabled),
+    ]);
+    assert_eq!(h.document.text(), "好second");
+    h.document.undo().unwrap();
+    assert_eq!(h.document.text(), "second");
+    h.document = original;
+    h.view = old_view;
+    h.view.request_focus();
+    h.frame(vec![ime(ImeEvent::Commit("你".into()))]);
+    assert_eq!(h.document.text(), "first");
+    assert_eq!(h.document.selection(), selection);
+    assert!(!h.document.can_undo());
+}
+
+#[test]
 fn horizontal_navigation_and_directed_selection_use_whole_graphemes() {
     let text = "中e\u{301}👩🏽‍💻🇨🇳1️⃣\r\n尾";
     let mut h = Harness::new(text);

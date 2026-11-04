@@ -179,6 +179,61 @@ fn load(host: &mut PluginHost, installation: &Installation) -> rusteditor_plugin
 }
 
 #[test]
+fn loaded_plugin_follows_active_document_without_sharing_histories_or_retaining_closed_tabs() {
+    let installation = Installation::new();
+    installation.plugin(
+        "text-tools",
+        "org.rusteditor.text-tools",
+        &binaries().text_tools,
+    );
+    let (a, mut host) = host();
+    let report = load(&mut host, &installation);
+    assert!(report.errors.is_empty(), "{:?}", report.errors);
+    let commands: Vec<_> = host
+        .commands()
+        .into_iter()
+        .map(|command| command.id)
+        .collect();
+    let b = Rc::new(RefCell::new(
+        Document::new(DocumentId(18), "second straße🙂").unwrap(),
+    ));
+    b.borrow_mut()
+        .set_selection(Selection {
+            anchor: 0,
+            head: 14,
+        })
+        .unwrap();
+    host.set_active_document(Some(b.clone())).unwrap();
+    host.invoke("org.rusteditor.text-tools.uppercase").unwrap();
+    assert_eq!(b.borrow().text(), "SECOND STRASSE🙂");
+    assert_eq!(a.borrow().revision().0, 1);
+    assert!(!a.borrow().can_undo());
+    host.set_active_document(Some(a.clone())).unwrap();
+    host.invoke("org.rusteditor.text-tools.uppercase").unwrap();
+    assert_eq!(a.borrow().text(), "你好 STRASSE🙂 e\u{301}\r\n");
+    b.borrow_mut().undo().unwrap();
+    assert_eq!(b.borrow().text(), "second straße🙂");
+    assert_eq!(a.borrow().revision().0, 2);
+    let closed = Rc::downgrade(&a);
+    host.set_active_document(Some(b.clone())).unwrap();
+    drop(a);
+    assert!(closed.upgrade().is_none());
+    assert_eq!(host.loaded_count(), 1);
+    assert_eq!(
+        host.commands()
+            .into_iter()
+            .map(|command| command.id)
+            .collect::<Vec<_>>(),
+        commands
+    );
+    host.set_active_document(None).unwrap();
+    assert!(host.invoke("org.rusteditor.text-tools.uppercase").is_err());
+    host.set_active_document(Some(b.clone())).unwrap();
+    host.invoke("org.rusteditor.text-tools.uppercase").unwrap();
+    assert_eq!(b.borrow().text(), "SECOND STRASSE🙂");
+}
+
+#[test]
 fn real_text_tools_changes_selection_in_one_undoable_transaction() {
     let installation = Installation::new();
     installation.plugin(

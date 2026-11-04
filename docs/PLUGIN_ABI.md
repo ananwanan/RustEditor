@@ -43,6 +43,8 @@ Functions are nullable C function pointers in the wire tables; every required fu
 
 `replace_text(context, request)` is allowed only during command invocation, with the declared replace-text capability and no reentrant mutation. It validates document identity, revision, range order, UTF-8 boundaries, replacement UTF-8 and final document size, then submits a core transaction. The replacement remains selected, and a Unicode expansion is one undo step. Initialization/shutdown cannot mutate documents.
 
+M1.3 routes reads and replacements through the host's active-document slot. UI-thread tab changes occur between command invocations and retain the same libraries, plugin instances, registrations, and callback tables. A request naming a previous tab is rejected even when its revision equals the active tab's revision. With no open document, selection/replacement callbacks return disabled and command invocation is refused. This changes host routing without changing the v1.0 wire layout.
+
 Registration is allowed during initialize only, with at most 64 commands per plugin / 1024 total. IDs must have the manifest plugin ID followed by a dot, use the ASCII ID alphabet, and be unique. A duplicate registration also invalidates initialization if its status was ignored. Unregistration during initialize/shutdown is idempotent; the host removes registrations on initialization rollback, disable, or exit.
 
 Capability bits are read-selection=1, replace-text=2, commands=4. Manifest declarations and the returned required-capabilities value must agree. Callbacks check the manifest grants. `error_details(context, buffer, out_required_length)` copies the host's most recent generic status diagnostic into caller storage; it never lends a temporary error pointer.

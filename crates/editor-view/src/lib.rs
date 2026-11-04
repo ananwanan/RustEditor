@@ -65,6 +65,13 @@ impl EditorView {
         self.h_pos = None;
     }
 
+    /// End a tab's native IME session. Both departing and arriving views must
+    /// reject delayed commits until a fresh Enabled or nonempty Preedit event.
+    pub fn reset_ime(&mut self) {
+        self.cancel_composition();
+        self.ignore_ime_commit = true;
+    }
+
     pub fn is_composing(&self) -> bool {
         self.composition.is_some()
     }

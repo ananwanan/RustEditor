@@ -1,5 +1,5 @@
 use eframe::egui;
-use rusteditor_editor_core::SaveSnapshot;
+use rusteditor_editor_core::{DocumentId, SaveSnapshot};
 use rusteditor_file_io::{DiskBaseline, SaveOutcome, SaveTarget, inspect_save_target, save_utf8};
 use std::{
     path::PathBuf,
@@ -39,17 +39,34 @@ pub enum Completion {
     },
 }
 
-#[derive(Default)]
+pub struct SaveCompletion {
+    pub document_id: DocumentId,
+    pub result: Result<Completion, String>,
+}
+
 pub struct SaveSession {
     pub association: Option<FileAssociation>,
     pub dialog: Option<SaveDialog>,
     pub path_input: String,
     pub focus_path: bool,
     pub close_after_write: bool,
+    document_id: DocumentId,
     worker: Option<JoinHandle<Result<Completion, String>>>,
 }
 
 impl SaveSession {
+    pub fn new(document_id: DocumentId, association: Option<FileAssociation>) -> Self {
+        Self {
+            association,
+            dialog: None,
+            path_input: String::new(),
+            focus_path: false,
+            close_after_write: false,
+            document_id,
+            worker: None,
+        }
+    }
+
     pub fn busy(&self) -> bool {
         self.worker.is_some()
     }
@@ -78,6 +95,9 @@ impl SaveSession {
         target: Arc<SaveTarget>,
         snapshot: SaveSnapshot,
     ) -> Result<(), String> {
+        if snapshot.document_id() != self.document_id {
+            return Err("save snapshot belongs to another document".into());
+        }
         self.start(move || {
             let outcome = save_utf8(&path, snapshot.text(), &target)
                 .map_err(|e| format!("{}: {e}", path.display()))?;
@@ -105,18 +125,46 @@ impl SaveSession {
         Ok(())
     }
 
-    pub fn poll(&mut self, ctx: &egui::Context) -> Option<Result<Completion, String>> {
+    pub fn poll(&mut self, ctx: &egui::Context) -> Option<SaveCompletion> {
         if !self.worker.as_ref()?.is_finished() {
             ctx.request_repaint_after(Duration::from_millis(25));
             return None;
         }
-        Some(
-            self.worker
+        Some(SaveCompletion {
+            document_id: self.document_id,
+            result: self
+                .worker
                 .take()
                 .expect("finished worker")
                 .join()
                 .unwrap_or_else(|_| Err("save worker exited unexpectedly".into())),
-        )
+        })
+    }
+
+    #[cfg(test)]
+    pub(crate) fn wait(&mut self) -> SaveCompletion {
+        SaveCompletion {
+            document_id: self.document_id,
+            result: self.worker.take().unwrap().join().unwrap(),
+        }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn pause(&mut self, resume: std::sync::mpsc::Receiver<()>) {
+        let worker = self.worker.take().expect("started worker");
+        self.worker = Some(thread::spawn(move || {
+            resume.recv().unwrap();
+            worker.join().unwrap()
+        }));
+    }
+
+    #[cfg(test)]
+    pub(crate) fn wait_until_ready(&self) {
+        let deadline = std::time::Instant::now() + Duration::from_secs(5);
+        while !self.worker.as_ref().expect("started worker").is_finished() {
+            assert!(std::time::Instant::now() < deadline, "save did not finish");
+            thread::sleep(Duration::from_millis(1));
+        }
     }
 }
 
@@ -145,7 +193,7 @@ mod tests {
             std::process::id()
         ));
         let mut doc = Document::new(DocumentId(1), "").unwrap();
-        let mut session = SaveSession::default();
+        let mut session = SaveSession::new(doc.id(), None);
         doc.replace(0..0, "first").unwrap();
         let snapshot = doc.capture_save_snapshot();
         let revision = snapshot.revision();

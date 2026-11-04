@@ -15,6 +15,7 @@ use std::{
 };
 
 pub type SharedDocument = Rc<RefCell<Document>>;
+type ActiveDocument = Rc<RefCell<Option<SharedDocument>>>;
 type Registry = Rc<RefCell<BTreeMap<String, Command>>>;
 type Logs = Rc<RefCell<Vec<String>>>;
 
@@ -59,7 +60,7 @@ struct Context {
     owner: ThreadId,
     id: String,
     capabilities: u64,
-    document: SharedDocument,
+    document: ActiveDocument,
     commands: Registry,
     logs: Logs,
     last_error: RefCell<String>,
@@ -148,7 +149,7 @@ impl Drop for LoadedPlugin {
 
 /// Not Send/Sync: UI-thread ownership is enforced by Rc and callback checks.
 pub struct PluginHost {
-    document: SharedDocument,
+    document: ActiveDocument,
     plugins: Vec<LoadedPlugin>,
     commands: Registry,
     logs: Logs,
@@ -158,7 +159,7 @@ pub struct PluginHost {
 impl PluginHost {
     pub fn new(document: SharedDocument) -> Self {
         Self {
-            document,
+            document: Rc::new(RefCell::new(Some(document))),
             plugins: Vec::new(),
             commands: Rc::default(),
             logs: Rc::default(),
@@ -174,6 +175,29 @@ impl PluginHost {
     }
     pub fn loaded_count(&self) -> usize {
         self.plugins.len()
+    }
+
+    /// Change the UI-thread command target without reloading native libraries.
+    /// No callback may be in progress; document IDs must identify distinct tabs.
+    pub fn set_active_document(
+        &mut self,
+        document: Option<SharedDocument>,
+    ) -> Result<(), PluginError> {
+        if self
+            .plugins
+            .iter()
+            .any(|plugin| !matches!(plugin.context().phase.get(), Phase::Ready | Phase::Disabled))
+        {
+            return Err(PluginError(
+                "document switch during plugin dispatch rejected".into(),
+            ));
+        }
+        *self
+            .document
+            .try_borrow_mut()
+            .map_err(|_| PluginError("document switch during host callback rejected".into()))? =
+            document;
+        Ok(())
     }
 
     /// Load once, during startup. The caller explicitly trusts this directory's
@@ -323,6 +347,9 @@ impl PluginHost {
     }
 
     pub fn invoke(&mut self, id: &str) -> Result<(), PluginError> {
+        if self.document.borrow().is_none() {
+            return Err(PluginError("no active document".into()));
+        }
         let command = self
             .commands
             .borrow()
