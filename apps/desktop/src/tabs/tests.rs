@@ -59,6 +59,160 @@ fn finish(workspace: &mut Workspace, id: DocumentId, resume: mpsc::Sender<()>) {
 }
 
 #[test]
+fn open_during_save_then_switch_and_close_preserves_each_owner_and_disk_baseline() {
+    let files = Files::new();
+    let opened_path = files.path("opened 中文.txt");
+    fs::write(&opened_path, "beta 世界🙂 e\u{301}\r\n").unwrap();
+    let mut w = workspace();
+    let a = DocumentId(1);
+    edit(&w, a, "snapshot A");
+    let resume_save = paused_save(&mut w, a, files.path("a.txt"));
+    w.start_open(opened_path.clone()).unwrap();
+    let (resume_open, wait) = mpsc::channel();
+    w.open.pause(wait);
+    assert!(w.start_open(opened_path.clone()).is_err());
+    let scratch = w.new_tab().unwrap();
+    edit(&w, scratch, "independent scratch");
+    w.activate(a);
+    edit(&w, a, "newer A");
+    w.request_close(a);
+    resume_open.send(()).unwrap();
+    w.open.wait_until_ready();
+    let ctx = egui::Context::default();
+    w.poll_open(&ctx, true); // Ready while composing: do not steal focus.
+    assert_eq!(w.active_id(), Some(a));
+    w.poll_open(&ctx, false);
+    let b = w.active_id().unwrap();
+    assert_ne!(b, a);
+    assert_eq!(
+        w.active().unwrap().document.borrow().text(),
+        "beta 世界🙂 e\u{301}\r\n"
+    );
+    assert!(!w.active().unwrap().document.borrow().is_modified());
+    assert!(
+        w.active()
+            .unwrap()
+            .save
+            .association
+            .as_ref()
+            .unwrap()
+            .target
+            .is_some()
+    );
+    finish(&mut w, a, resume_save);
+    assert_eq!(w.active_id(), Some(b));
+    assert!(w.tab(a).unwrap().confirm_close);
+    assert_eq!(fs::read(files.path("a.txt")).unwrap(), b"snapshot A");
+    assert_eq!(
+        w.tab(scratch).unwrap().document.borrow().text(),
+        "independent scratch"
+    );
+    w.cancel_close(a);
+    edit(&w, b, "saved opened B");
+    w.active_mut().unwrap().start_save(false);
+    let completion = w.active_mut().unwrap().save.wait();
+    w.complete_save(completion);
+    assert_eq!(fs::read(opened_path).unwrap(), b"saved opened B");
+    w.request_close(b);
+    assert!(w.tab(b).is_none());
+    assert!(w.tab(a).unwrap().document.borrow().is_modified());
+}
+
+#[test]
+fn failed_canceled_and_modal_deferred_opens_never_replace_existing_tabs() {
+    let files = Files::new();
+    let path = files.path("read.txt");
+    fs::write(&path, "incoming\n").unwrap();
+    let mut w = workspace();
+    edit(&w, DocumentId(1), "keep 你好");
+    let selection = w.active().unwrap().document.borrow().selection();
+    let ctx = egui::Context::default();
+    for (name, bytes) in [
+        ("bad.txt", vec![0xff]),
+        ("bom.txt", b"\xef\xbb\xbftext".to_vec()),
+        (
+            "large.txt",
+            vec![b'x'; rusteditor_editor_core::MAX_DOCUMENT_BYTES + 1],
+        ),
+    ] {
+        let bad = files.path(name);
+        fs::write(&bad, bytes).unwrap();
+        w.start_open(bad).unwrap();
+        w.open.wait_until_ready();
+        w.poll_open(&ctx, false);
+        assert!(w.open.status.starts_with("Open failed:"));
+        assert!(w.open.status.contains(name));
+        assert_eq!(w.tabs.len(), 1);
+        assert_eq!(w.active().unwrap().document.borrow().selection(), selection);
+        assert_eq!(w.active().unwrap().document.borrow().text(), "keep 你好");
+        assert!(w.active().unwrap().document.borrow().can_undo());
+    }
+    w.start_open(path.clone()).unwrap();
+    w.open.wait_until_ready();
+    w.active_mut().unwrap().confirm_close = true;
+    w.poll_open(&ctx, false);
+    assert_eq!(w.tabs.len(), 1);
+    w.cancel_close(DocumentId(1));
+    w.open.cancel();
+    w.poll_open(&ctx, false);
+    assert_eq!(w.tabs.len(), 1);
+    assert!(!w.open.busy());
+    w.start_open(path).unwrap();
+    w.open.wait_until_ready();
+    w.poll_open(&ctx, false);
+    assert_eq!(w.tabs.len(), 2);
+}
+
+#[test]
+fn pending_open_reserves_the_last_tab_slot_and_can_finish_after_all_tabs_close() {
+    let files = Files::new();
+    let path = files.path("empty.txt");
+    fs::write(&path, "").unwrap();
+    let mut w = workspace();
+    w.start_open(path.clone()).unwrap();
+    for _ in 1..MAX_TABS - 1 {
+        w.new_tab().unwrap();
+    }
+    assert!(!w.can_add_tab());
+    assert!(w.new_tab().is_err());
+    w.open.wait_until_ready();
+    w.poll_open(&egui::Context::default(), false);
+    assert_eq!(w.tabs.len(), MAX_TABS);
+    let ids: Vec<_> = w.tabs.iter().map(Tab::id).collect();
+    for id in ids {
+        w.request_close(id);
+    }
+    assert!(w.tabs.is_empty());
+    w.start_open(path).unwrap();
+    w.open.wait_until_ready();
+    w.poll_open(&egui::Context::default(), false);
+    assert_eq!(w.tabs.len(), 1);
+    assert!(w.active_id().unwrap().0 > MAX_TABS as u64);
+}
+
+#[test]
+fn canceled_inflight_read_holds_its_slot_and_cannot_reopen_the_workspace() {
+    let files = Files::new();
+    let path = files.path("canceled.txt");
+    fs::write(&path, "never apply").unwrap();
+    let mut w = workspace();
+    w.start_open(path.clone()).unwrap();
+    let (resume, wait) = mpsc::channel();
+    w.open.pause(wait);
+    w.open.cancel();
+    assert!(w.open.busy());
+    assert!(w.start_open(path).is_err());
+    w.request_close(DocumentId(1));
+    assert!(w.tabs.is_empty());
+    resume.send(()).unwrap();
+    w.open.wait_until_ready();
+    w.poll_open(&egui::Context::default(), false);
+    assert!(!w.open.busy());
+    assert!(w.tabs.is_empty());
+    assert!(w.active_id().is_none());
+}
+
+#[test]
 fn simultaneous_saves_complete_in_reverse_order_after_switch_and_keep_newer_edits() {
     let files = Files::new();
     let mut w = workspace();

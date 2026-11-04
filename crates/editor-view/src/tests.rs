@@ -31,6 +31,16 @@ impl Harness {
     fn frame(&mut self, events: Vec<Event>) -> egui::FullOutput {
         self.time += 0.02;
         self.error = None;
+        let modifiers = events
+            .iter()
+            .rev()
+            .find_map(|event| match event {
+                Event::Key { modifiers, .. } | Event::PointerButton { modifiers, .. } => {
+                    Some(*modifiers)
+                }
+                _ => None,
+            })
+            .unwrap_or_default();
         self.ctx.run(
             egui::RawInput {
                 screen_rect: Some(egui::Rect::from_min_size(
@@ -38,6 +48,7 @@ impl Harness {
                     egui::vec2(900.0, 600.0),
                 )),
                 focused: self.focused,
+                modifiers,
                 time: Some(self.time),
                 events,
                 ..Default::default()
@@ -83,6 +94,133 @@ fn key(key: Key) -> Event {
 }
 fn ime(event: ImeEvent) -> Event {
     Event::Ime(event)
+}
+
+fn numbers(output: &egui::FullOutput) -> Vec<(usize, egui::Pos2, egui::Rect)> {
+    output
+        .shapes
+        .iter()
+        .filter_map(|shape| {
+            if let egui::epaint::Shape::Text(text) = &shape.shape {
+                text.galley
+                    .text()
+                    .parse()
+                    .ok()
+                    .map(|number| (number, text.pos, shape.clip_rect))
+            } else {
+                None
+            }
+        })
+        .collect()
+}
+
+#[test]
+fn gutter_counts_empty_trailing_and_crlf_lines_and_grows_at_digit_boundaries() {
+    for (text, count) in [
+        ("", 1),
+        ("a", 1),
+        ("\n", 2),
+        ("a\nb\n", 3),
+        ("a\r\nb\r\n", 3),
+        ("a\r\n\nb", 3),
+    ] {
+        let mut h = Harness::new(text);
+        let output = h.frame(vec![]);
+        assert_eq!(
+            numbers(&output).iter().map(|n| n.0).collect::<Vec<_>>(),
+            (1..=count).collect::<Vec<_>>(),
+            "{text:?}"
+        );
+        assert_eq!(h.view.status(&h.document).lines, count);
+    }
+    let mut h = Harness::new(&"a\n".repeat(98));
+    let before = h.frame(vec![]).platform_output.ime.unwrap().rect.left();
+    h.document.replace(0..0, "b\n").unwrap();
+    let after = h.frame(vec![]).platform_output.ime.unwrap().rect.left();
+    assert!(after > before, "three-digit gutter reserves more space");
+    h.document.undo().unwrap();
+    assert!((h.frame(vec![]).platform_output.ime.unwrap().rect.left() - before).abs() < 0.1);
+}
+
+#[test]
+fn gutter_stays_fixed_and_pointer_selection_and_ime_follow_scrolled_text_at_each_scale() {
+    let line = format!("{}中e\u{301}\r\n", "abc".repeat(100));
+    for scale in [1.0, 1.5, 2.0] {
+        let mut h = Harness::new(&line.repeat(100));
+        h.ctx.set_pixels_per_point(scale);
+        h.caret(20 * line.len() + 60);
+        let before = h.frame(vec![]);
+        let gutter = numbers(&before)[0].2;
+        h.scroll_offset = Some(egui::vec2(48.0, 128.0));
+        let after = h.frame(vec![]);
+        let visible = numbers(&after);
+        assert!(visible[0].0 > 1);
+        assert_eq!(visible[0].2.left(), gutter.left());
+        assert_eq!(visible[0].2.right(), gutter.right());
+        let caret = after.platform_output.ime.unwrap().rect;
+        let old_caret = before.platform_output.ime.unwrap().rect;
+        assert!((old_caret.left() - caret.left() - 48.0).abs() < 0.1);
+        assert!((old_caret.top() - caret.top() - 128.0).abs() < 0.1);
+        let pos = caret.center();
+        h.frame(vec![
+            Event::PointerMoved(pos),
+            Event::PointerButton {
+                pos,
+                button: egui::PointerButton::Primary,
+                pressed: true,
+                modifiers: Modifiers::NONE,
+            },
+        ]);
+        assert_eq!(h.document.selection().head, 20 * line.len() + 60);
+        h.frame(vec![Event::PointerButton {
+            pos,
+            button: egui::PointerButton::Primary,
+            pressed: false,
+            modifiers: Modifiers::NONE,
+        }]);
+        // Clicking the fixed gutter targets the start of the displayed row,
+        // even when that line's first characters are horizontally off-screen.
+        let pos = egui::pos2(gutter.center().x, caret.center().y);
+        h.time += 0.6;
+        h.frame(vec![
+            Event::PointerMoved(pos),
+            Event::PointerButton {
+                pos,
+                button: egui::PointerButton::Primary,
+                pressed: true,
+                modifiers: Modifiers::SHIFT,
+            },
+        ]);
+        assert_eq!(
+            h.document.selection(),
+            Selection {
+                anchor: 20 * line.len() + 60,
+                head: 20 * line.len()
+            }
+        );
+    }
+}
+
+#[test]
+fn status_reports_directed_grapheme_selection_and_current_line_endings_after_undo() {
+    let mut h = Harness::new("中e\u{301}🙂\r\n尾\n");
+    h.document
+        .set_selection(Selection {
+            anchor: h.document.text().len(),
+            head: "中e\u{301}".len(),
+        })
+        .unwrap();
+    let status = h.view.status(&h.document);
+    assert_eq!((status.lines, status.line, status.column), (3, 1, 3));
+    assert_eq!(status.line_endings, "Mixed");
+    assert_eq!(status.selection_graphemes, 4);
+    assert_eq!(status.selection_bytes, "🙂\r\n尾\n".len());
+    h.document
+        .replace(0..h.document.text().len(), "new\r\n")
+        .unwrap();
+    assert_eq!(h.view.status(&h.document).line_endings, "CRLF");
+    h.document.undo().unwrap();
+    assert_eq!(h.view.status(&h.document), status);
 }
 
 #[test]

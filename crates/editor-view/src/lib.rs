@@ -3,7 +3,10 @@
 #![forbid(unsafe_code)]
 
 mod grapheme;
+mod gutter;
 mod input;
+mod status;
+pub use status::DocumentStatus;
 
 use egui::{
     Color32, EventFilter, FontId, Galley, Id, Response, Sense, Ui,
@@ -30,6 +33,7 @@ pub struct EditorView {
     h_pos: Option<f32>,
     focus_requested: bool,
     last_interaction: f64,
+    status_cache: Option<(DocumentId, Revision, Selection, DocumentStatus)>,
 }
 
 impl Default for EditorView {
@@ -41,6 +45,7 @@ impl Default for EditorView {
             h_pos: None,
             focus_requested: true,
             last_interaction: 0.0,
+            status_cache: None,
         }
     }
 }
@@ -51,6 +56,19 @@ pub struct ViewOutput {
 }
 
 impl EditorView {
+    /// Cached by identity/revision/selection; never retains editable text.
+    pub fn status(&mut self, document: &Document) -> DocumentStatus {
+        let key = (document.id(), document.revision(), document.selection());
+        if let Some((id, revision, selection, status)) = self.status_cache
+            && (id, revision, selection) == key
+        {
+            return status;
+        }
+        let status = DocumentStatus::new(document);
+        self.status_cache = Some((key.0, key.1, key.2, status));
+        status
+    }
+
     fn cancel_composition(&mut self) {
         // A platform may deliver a bare Commit without Enabled or Preedit.
         // Ignore delayed commits only when an observed session was cancelled;
@@ -105,7 +123,8 @@ impl EditorView {
         let font = FontId::monospace(16.0);
         let color = ui.visuals().text_color();
         let mut galley = self.layout(ui.ctx(), document, &font, color);
-        let size = (galley.size() + egui::vec2(12.0, 12.0)).max(ui.available_size());
+        let gutter_width = gutter::width(ui, &galley, &font);
+        let size = (galley.size() + egui::vec2(gutter_width + 12.0, 12.0)).max(ui.available_size());
         let (_, rect) = ui.allocate_space(size);
         // Assign a stable focus ID separately from the allocation's automatic ID.
         let mut response = ui
@@ -115,7 +134,14 @@ impl EditorView {
             response.request_focus();
             self.focus_requested = false;
         }
-        let pos = rect.min + egui::vec2(6.0, 6.0);
+        let pos = rect.min + egui::vec2(gutter_width + 6.0, 6.0);
+        // Keep line numbers fixed when horizontally scrolling the text.
+        // ScrollArea expands its clip by this margin. Anchor at the viewport's
+        // content edge so the gutter does not jump when the offset leaves zero.
+        let gutter_left = rect
+            .left()
+            .max(ui.clip_rect().left() + ui.visuals().clip_rect_margin);
+        let gutter_right = gutter_left + gutter_width;
         let mut interacted = false;
         if ui.is_enabled()
             && let Some(pointer) = response.interact_pointer_pos()
@@ -127,9 +153,12 @@ impl EditorView {
                 galley = self.layout(ui.ctx(), document, &font, color);
             }
             if !self.is_composing() {
-                let scalar = galley.cursor_from_pos(pointer - pos);
-                let pointer_cursor =
-                    nearest_cursor(document.text(), &galley, scalar, pointer - pos);
+                let mut relative = pointer - pos;
+                if pointer.x < gutter_right {
+                    relative.x = 0.0;
+                }
+                let scalar = galley.cursor_from_pos(relative);
+                let pointer_cursor = nearest_cursor(document.text(), &galley, scalar, relative);
                 let mut state = TextCursorState::from(cursors(
                     document.text(),
                     document.selection(),
@@ -220,18 +249,41 @@ impl EditorView {
             galley = self.layout(ui.ctx(), document, &font, color);
         }
 
+        // Input can change the digit count in this very frame.
+        let gutter_width = gutter::width(ui, &galley, &font);
+        let pos = rect.min + egui::vec2(gutter_width + 6.0, 6.0);
+        let gutter_rect = egui::Rect::from_min_max(
+            egui::pos2(gutter_left, ui.clip_rect().top().max(rect.top())),
+            egui::pos2(
+                gutter_left + gutter_width,
+                ui.clip_rect().bottom().min(rect.bottom()),
+            ),
+        );
+        let text_clip = egui::Rect::from_min_max(
+            egui::pos2(gutter_rect.right(), ui.clip_rect().top()),
+            ui.clip_rect().max,
+        )
+        .intersect(rect);
         let displayed_selection = self.display_selection(document);
         let range = cursors(galley.text(), displayed_selection, self.h_pos);
         let row_height = ui.fonts_mut(|f| f.row_height(&font));
         let caret = cursor_rect(&galley, &range.primary, row_height).translate(pos.to_vec2());
-        let painter = ui.painter_at(rect.intersect(ui.clip_rect()));
-        painter.rect_filled(rect, 0.0, ui.visuals().extreme_bg_color);
+        ui.painter_at(rect.intersect(ui.clip_rect())).rect_filled(
+            rect,
+            0.0,
+            ui.visuals().extreme_bg_color,
+        );
+        let painter = ui.painter_at(text_clip);
         visuals::paint_text_selection(&mut galley, ui.visuals(), &range, None);
+        gutter::paint(ui, &galley, pos, gutter_rect, &font);
         painter.galley(pos, galley, color);
         if focused {
             if interacted {
                 self.last_interaction = ui.input(|i| i.time);
-                ui.scroll_to_rect(caret.expand(6.0), None);
+                let mut target = caret.expand(6.0);
+                target.min.x -= gutter_width;
+                ui.scroll_to_rect(target, None);
+                ui.ctx().request_repaint();
             }
             visuals::paint_text_cursor(
                 ui,

@@ -3,6 +3,7 @@
 
 mod fonts;
 mod native;
+mod open;
 mod save;
 mod tabs;
 mod view;

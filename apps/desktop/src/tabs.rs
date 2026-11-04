@@ -153,6 +153,7 @@ pub struct Workspace {
     active: Option<DocumentId>,
     next_id: u64,
     pub closing_all: bool,
+    pub open: crate::open::OpenSession,
 }
 
 impl Workspace {
@@ -165,6 +166,7 @@ impl Workspace {
             active,
             next_id,
             closing_all: false,
+            open: crate::open::OpenSession::default(),
         }
     }
 
@@ -207,6 +209,21 @@ impl Workspace {
     }
 
     pub fn new_tab(&mut self) -> Result<DocumentId, String> {
+        if !self.can_add_tab() {
+            return Err(format!("At most {MAX_TABS} tabs can be open"));
+        }
+        self.add_document(String::new(), None)
+    }
+
+    pub fn can_add_tab(&self) -> bool {
+        self.tabs.len() + usize::from(self.open.busy()) < MAX_TABS
+    }
+
+    fn add_document(
+        &mut self,
+        text: String,
+        association: Option<FileAssociation>,
+    ) -> Result<DocumentId, String> {
         if self.tabs.len() >= MAX_TABS {
             return Err(format!("At most {MAX_TABS} tabs can be open"));
         }
@@ -215,11 +232,44 @@ impl Workspace {
             .next_id
             .checked_add(1)
             .ok_or("document IDs exhausted")?;
-        let document = Document::new(id, "").map_err(|error| error.to_string())?;
+        let document = Document::new(id, text).map_err(|error| error.to_string())?;
         self.tabs
-            .push(Tab::new(Rc::new(RefCell::new(document)), None));
+            .push(Tab::new(Rc::new(RefCell::new(document)), association));
         self.activate(id);
         Ok(id)
+    }
+
+    pub fn start_open(&mut self, path: PathBuf) -> Result<(), String> {
+        if !self.can_add_tab() {
+            return Err(format!(
+                "At most {MAX_TABS} tabs can be open (including the pending open)"
+            ));
+        }
+        self.open.start(path)
+    }
+
+    /// Run after frame input and save completion handling, never ahead of edits.
+    pub fn poll_open(&mut self, ctx: &egui::Context, composing: bool) {
+        let defer =
+            composing || self.modal_owner().is_some() || self.closing_all || self.open.dialog;
+        let Some(result) = self.open.poll(ctx, defer) else {
+            return;
+        };
+        match result.and_then(|file| {
+            let path = file.path.clone();
+            self.add_document(
+                file.text,
+                Some(FileAssociation::new(file.path, Some(file.baseline))),
+            )?;
+            Ok(path)
+        }) {
+            Ok(path) => {
+                self.open.status = format!("Opened {}", path.display());
+                ctx.send_viewport_cmd(egui::ViewportCommand::IMEAllowed(false));
+            }
+            Err(error) => self.open.status = format!("Open failed: {error}"),
+        }
+        ctx.request_repaint();
     }
 
     pub fn request_close(&mut self, id: DocumentId) {

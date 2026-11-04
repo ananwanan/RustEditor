@@ -1,8 +1,5 @@
 #![forbid(unsafe_code)]
-use crate::{
-    save::SaveDialog,
-    tabs::{MAX_TABS, Workspace},
-};
+use crate::{save::SaveDialog, tabs::Workspace};
 use eframe::egui::{self, Color32, Key, Modifiers};
 use rusteditor_editor_core::DocumentId;
 use std::{path::PathBuf, sync::Arc};
@@ -12,6 +9,58 @@ pub struct EditorApp {
     diagnostics: Vec<String>,
     allow_close: bool,
     font_status: String,
+    dialog_ime_active: bool,
+}
+
+#[derive(Clone, Copy)]
+struct Actions {
+    new: bool,
+    open: bool,
+    save: bool,
+    save_as: bool,
+    close: bool,
+    undo: bool,
+    redo: bool,
+}
+
+impl Actions {
+    fn available(workspace: &Workspace, blocked: bool) -> Self {
+        let enabled = !blocked && !workspace.closing_all;
+        let tab = workspace.active();
+        let idle = enabled && tab.is_some_and(|tab| !tab.save.busy());
+        Self {
+            new: enabled && workspace.can_add_tab(),
+            open: enabled && workspace.can_add_tab() && !workspace.open.busy(),
+            save: idle
+                && tab.is_some_and(|tab| {
+                    tab.document.borrow().is_modified() || tab.save.association.is_none()
+                }),
+            save_as: idle,
+            close: enabled && tab.is_some(),
+            undo: enabled && tab.is_some_and(|tab| tab.document.borrow().can_undo()),
+            redo: enabled && tab.is_some_and(|tab| tab.document.borrow().can_redo()),
+        }
+    }
+}
+
+fn action_button(ui: &mut egui::Ui, label: &str, key: Key, shift: bool, enabled: bool) -> bool {
+    let modifiers = if shift {
+        Modifiers::COMMAND | Modifiers::SHIFT
+    } else {
+        Modifiers::COMMAND
+    };
+    let shortcut = ui
+        .ctx()
+        .format_shortcut(&egui::KeyboardShortcut::new(modifiers, key));
+    if ui
+        .add_enabled(enabled, egui::Button::new(label).shortcut_text(shortcut))
+        .clicked()
+    {
+        ui.close();
+        true
+    } else {
+        false
+    }
 }
 
 impl EditorApp {
@@ -33,6 +82,7 @@ impl EditorApp {
             diagnostics,
             allow_close: false,
             font_status,
+            dialog_ime_active: false,
         }
     }
 
@@ -54,7 +104,7 @@ impl EditorApp {
         }
     }
 
-    fn show_save_dialog(&mut self, ctx: &egui::Context, id: DocumentId) {
+    fn show_save_dialog(&mut self, ctx: &egui::Context, id: DocumentId, ime_input: bool) {
         let Some(tab) = self.workspace.tab_mut(id) else {
             return;
         };
@@ -79,6 +129,7 @@ impl EditorApp {
                         input.request_focus();
                     }
                     accept = !tab.save.path_input.is_empty()
+                        && !ime_input
                         && input.lost_focus()
                         && ui.input(|input| input.key_pressed(Key::Enter));
                 }
@@ -123,6 +174,47 @@ impl EditorApp {
         }
     }
 
+    fn show_open_dialog(&mut self, ctx: &egui::Context, ime_input: bool) {
+        let open = &mut self.workspace.open;
+        let focus = std::mem::take(&mut open.focus_path);
+        let mut accept = false;
+        let mut cancel = false;
+        let modal = egui::Modal::new(egui::Id::new("open_file")).show(ctx, |ui| {
+            ui.heading("Open UTF-8 file");
+            ui.label("File path (UTF-8 without BOM, up to 4 MiB)");
+            let input =
+                ui.add(egui::TextEdit::singleline(&mut open.path_input).desired_width(460.0));
+            if focus {
+                input.request_focus();
+            }
+            accept = !ime_input
+                && !open.path_input.is_empty()
+                && input.lost_focus()
+                && ui.input(|input| input.key_pressed(Key::Enter));
+            ui.label(&open.status);
+            ui.horizontal(|ui| {
+                accept |= ui
+                    .add_enabled(!open.path_input.is_empty(), egui::Button::new("Open"))
+                    .clicked();
+                cancel = ui.button("Cancel").clicked();
+            });
+        });
+        if cancel || modal.should_close() {
+            self.workspace.open.cancel();
+            if let Some(tab) = self.workspace.active_mut() {
+                tab.editor.request_focus();
+            }
+        } else if accept {
+            let path = PathBuf::from(&self.workspace.open.path_input);
+            if let Err(error) = self.workspace.start_open(path) {
+                self.workspace.open.status = format!("Open failed: {error}");
+            }
+            if let Some(tab) = self.workspace.active_mut() {
+                tab.editor.request_focus();
+            }
+        }
+    }
+
     fn show_close_dialog(&mut self, ctx: &egui::Context, id: DocumentId) {
         let tab = self.workspace.tab(id).expect("modal owner");
         let mut save = false;
@@ -153,25 +245,56 @@ impl EditorApp {
 
 impl EditorApp {
     fn update_frame(&mut self, ctx: &egui::Context) {
+        let ime_events = ctx.input(|input| {
+            input
+                .events
+                .iter()
+                .any(|e| matches!(e, egui::Event::Ime(_)))
+        });
+        let dialog_ime_input = self.dialog_ime_active || ime_events;
+        if self.workspace.open.dialog || self.workspace.modal_owner().is_some() {
+            ctx.input(|input| {
+                for event in &input.events {
+                    match event {
+                        egui::Event::Ime(egui::ImeEvent::Enabled | egui::ImeEvent::Preedit(_)) => {
+                            self.dialog_ime_active = true
+                        }
+                        egui::Event::Ime(egui::ImeEvent::Commit(_) | egui::ImeEvent::Disabled)
+                        | egui::Event::WindowFocused(false) => self.dialog_ime_active = false,
+                        _ => {}
+                    }
+                }
+            });
+        } else {
+            self.dialog_ime_active = false;
+        }
         let composing = self
             .workspace
             .active()
             .is_some_and(|tab| tab.editor.blocks_shortcuts(ctx));
-        let modal_open = self.workspace.modal_owner().is_some();
-        let can_command = !modal_open && !composing && self.workspace.active().is_some();
-        let can_save = can_command && self.workspace.active().is_some_and(|tab| !tab.save.busy());
+        let modal_open = self.workspace.modal_owner().is_some() || self.workspace.open.dialog;
+        let available = Actions::available(&self.workspace, modal_open || composing || ime_events);
+        let can_command = available.close;
         let mut action = None;
         let mut undo = false;
         let mut redo = false;
         let mut save = false;
         let mut save_as = false;
         let mut new_tab = false;
+        let mut open = false;
         let mut close_tab = None;
         let mut switch_tab = None;
-        if !modal_open && !composing {
+        let editor_focused = self.workspace.active_id().is_some_and(|id| {
+            ctx.memory(|memory| memory.has_focus(egui::Id::new(("document_editor", id.0))))
+        });
+        if !modal_open && !composing && !ime_events && !self.workspace.closing_all {
             ctx.input_mut(|input| {
                 new_tab = input
-                    .consume_shortcut(&egui::KeyboardShortcut::new(Modifiers::COMMAND, Key::N));
+                    .consume_shortcut(&egui::KeyboardShortcut::new(Modifiers::COMMAND, Key::N))
+                    && available.new;
+                open = input
+                    .consume_shortcut(&egui::KeyboardShortcut::new(Modifiers::COMMAND, Key::O))
+                    && available.open;
                 if can_command {
                     if input
                         .consume_shortcut(&egui::KeyboardShortcut::new(Modifiers::COMMAND, Key::W))
@@ -200,16 +323,35 @@ impl EditorApp {
                                 .id(),
                         );
                     }
-                    if can_save {
-                        save_as = input.consume_shortcut(&egui::KeyboardShortcut::new(
+                    {
+                        let save_as_pressed = input.consume_shortcut(&egui::KeyboardShortcut::new(
                             Modifiers::COMMAND | Modifiers::SHIFT,
                             Key::S,
                         ));
-                        save = !save_as
+                        save_as = save_as_pressed && available.save_as;
+                        save = !save_as_pressed
                             && input.consume_shortcut(&egui::KeyboardShortcut::new(
                                 Modifiers::COMMAND,
                                 Key::S,
-                            ));
+                            ))
+                            && available.save_as;
+                    }
+                    // The focused editor preserves ordered text/undo events.
+                    // Route shortcuts here only when a menu/toolbar owns focus.
+                    if !editor_focused {
+                        let redo_pressed = input.consume_shortcut(&egui::KeyboardShortcut::new(
+                            Modifiers::COMMAND | Modifiers::SHIFT,
+                            Key::Z,
+                        )) || input.consume_shortcut(
+                            &egui::KeyboardShortcut::new(Modifiers::COMMAND, Key::Y),
+                        );
+                        redo = redo_pressed && available.redo;
+                        undo = !redo_pressed
+                            && input.consume_shortcut(&egui::KeyboardShortcut::new(
+                                Modifiers::COMMAND,
+                                Key::Z,
+                            ))
+                            && available.undo;
                     }
                     if input.consume_shortcut(&egui::KeyboardShortcut::new(
                         Modifiers::COMMAND | Modifiers::SHIFT,
@@ -250,7 +392,10 @@ impl EditorApp {
                                             tab.title(),
                                         ),
                                     )
-                                    .on_hover_text(&tab.status)
+                                    .on_hover_text(tab.save.association.as_ref().map_or_else(
+                                        || tab.status.clone(),
+                                        |file| format!("{}\n{}", file.path.display(), tab.status),
+                                    ))
                                     .clicked()
                                 {
                                     switch_tab = Some(tab.id());
@@ -259,7 +404,7 @@ impl EditorApp {
                                     ui.spinner();
                                 }
                                 if ui
-                                    .add_enabled(!modal_open && !composing, egui::Button::new("×"))
+                                    .add_enabled(available.close, egui::Button::new("×"))
                                     .on_hover_text("Close tab (Ctrl+W)")
                                     .clicked()
                                 {
@@ -270,26 +415,41 @@ impl EditorApp {
                     });
                 });
             ui.separator();
-            ui.horizontal(|ui| {
+            egui::MenuBar::new().ui(ui, |ui| {
+                ui.menu_button("File", |ui| {
+                    new_tab |= action_button(ui, "New", Key::N, false, available.new);
+                    open |= action_button(ui, "Open…", Key::O, false, available.open);
+                    ui.separator();
+                    save |= action_button(ui, "Save", Key::S, false, available.save);
+                    save_as |= action_button(ui, "Save As…", Key::S, true, available.save_as);
+                    ui.separator();
+                    if action_button(ui, "Close tab", Key::W, false, available.close) {
+                        close_tab = self.workspace.active_id();
+                    }
+                });
+                ui.menu_button("Edit", |ui| {
+                    undo |= action_button(ui, "Undo", Key::Z, false, available.undo);
+                    redo |= action_button(ui, "Redo", Key::Y, false, available.redo);
+                });
                 new_tab |= ui
-                    .add_enabled(
-                        !modal_open && !composing && self.workspace.tabs.len() < MAX_TABS,
-                        egui::Button::new("New"),
-                    )
+                    .add_enabled(available.new, egui::Button::new("New"))
+                    .clicked();
+                open |= ui
+                    .add_enabled(available.open, egui::Button::new("Open"))
+                    .on_hover_text("Open file (Ctrl+O)")
                     .clicked();
                 save |= ui
-                    .add_enabled(can_save, egui::Button::new("Save"))
+                    .add_enabled(available.save, egui::Button::new("Save"))
                     .clicked();
                 save_as |= ui
-                    .add_enabled(can_save, egui::Button::new("Save As"))
+                    .add_enabled(available.save_as, egui::Button::new("Save As"))
                     .clicked();
-                if let Some(tab) = self.workspace.active() {
-                    let doc = tab.document.borrow();
+                if self.workspace.active().is_some() {
                     undo |= ui
-                        .add_enabled(can_command && doc.can_undo(), egui::Button::new("Undo"))
+                        .add_enabled(available.undo, egui::Button::new("Undo"))
                         .clicked();
                     redo |= ui
-                        .add_enabled(can_command && doc.can_redo(), egui::Button::new("Redo"))
+                        .add_enabled(available.redo, egui::Button::new("Redo"))
                         .clicked();
                 }
                 ui.menu_button("Plugins", |ui| {
@@ -333,23 +493,37 @@ impl EditorApp {
             }
             if self.workspace.host.commands().is_empty() { ui.label("Run cargo xtask stage, then restart to enable text-tools."); }
             ui.separator();
-            ui.label("Ctrl+N  New tab\nCtrl+W  Close tab\nCtrl+Tab / Ctrl+Shift+Tab  Switch tab\nCtrl+Shift+U  Uppercase\nCtrl+Z  Undo\nCtrl+Y / Ctrl+Shift+Z  Redo\nCtrl+C / X / V  Clipboard");
+            ui.label("Ctrl+N  New tab\nCtrl+O  Open file\nCtrl+S / Ctrl+Shift+S  Save / Save As\nCtrl+W  Close tab\nCtrl+Tab / Ctrl+Shift+Tab  Switch tab\nCtrl+Shift+U  Uppercase\nCtrl+Z  Undo\nCtrl+Y / Ctrl+Shift+Z  Redo\nCtrl+C / X / V  Clipboard");
             ui.separator();
             ui.label(egui::RichText::new(&self.font_status).small());
             for error in &self.diagnostics { ui.colored_label(Color32::LIGHT_RED, error); }
         });
 
         egui::TopBottomPanel::bottom("status").show(ctx, |ui| {
-            if let Some(tab) = self.workspace.active() {
+            if !self.workspace.open.status.is_empty() {
+                ui.horizontal_wrapped(|ui| {
+                    ui.label(&self.workspace.open.status);
+                    if self.workspace.open.busy() {
+                        ui.spinner();
+                        if ui.button("Cancel Open").clicked() { self.workspace.open.cancel(); }
+                    }
+                });
+            }
+            if let Some(tab) = self.workspace.active_mut() {
                 let doc = tab.document.borrow();
+                let status = tab.editor.status(&doc);
+                let path = tab.save.association.as_ref().map_or_else(|| tab.title(), |file| file.path.display().to_string());
+                ui.add(egui::Label::new(path).truncate()).on_hover_text(tab.save.association.as_ref().map_or_else(|| "No file path".into(), |file| file.path.display().to_string()));
                 ui.add(egui::Label::new(&tab.status).wrap());
-                ui.horizontal(|ui| {
+                ui.horizontal_wrapped(|ui| {
                     ui.label(format!(
-                        "UTF-8 · {} bytes · revision {} · selection {} bytes",
+                        "{} · UTF-8 · {} · {} bytes · {} lines · Ln {}, Col {} · selection {} graphemes / {} bytes · revision {}",
+                        if doc.is_modified() { "Modified" } else { "Unmodified" },
+                        status.line_endings,
                         doc.text().len(),
-                        doc.revision().0,
-                        doc.selected_text().len()
-                    ));
+                        status.lines, status.line, status.column,
+                        status.selection_graphemes, status.selection_bytes, doc.revision().0,
+                    )).on_hover_text("Lines split at LF (CRLF counts once). Columns and selection count Unicode graphemes; a tab counts once. None means no line ending is present. Enter inserts LF; existing bytes are preserved.");
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         ui.label(format!("{:.0}% scale", ctx.pixels_per_point() * 100.0));
                         if composing {
@@ -358,7 +532,7 @@ impl EditorApp {
                     });
                 });
             } else {
-                ui.label("No documents. Use New to open a scratch tab.");
+                ui.label("No documents. Use New or Open.");
             }
         });
         egui::CentralPanel::default().show(ctx, |ui| {
@@ -384,7 +558,7 @@ impl EditorApp {
                 });
             } else {
                 ui.centered_and_justified(|ui| {
-                    ui.label("Create a new tab with Ctrl+N");
+                    ui.label("New: Ctrl+N · Open: Ctrl+O");
                 });
             }
         });
@@ -400,7 +574,7 @@ impl EditorApp {
             }
             ctx.request_repaint();
         }
-        if (save || save_as)
+        if (save_as || (save && Actions::available(&self.workspace, false).save))
             && let Some(tab) = self.workspace.active_mut()
         {
             tab.start_save(save_as);
@@ -425,12 +599,17 @@ impl EditorApp {
             }
             ctx.request_repaint();
         }
+        if open {
+            self.workspace.open.choose_path();
+            ctx.request_repaint();
+        }
         if let Some(id) = close_tab {
             self.workspace.request_close(id);
         }
         if ctx.input(|input| input.viewport().close_requested()) && !self.allow_close {
             ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
             if !composing && !modal_open {
+                self.workspace.open.cancel();
                 self.workspace.closing_all = true;
             }
         }
@@ -443,9 +622,12 @@ impl EditorApp {
             if self.workspace.tab(id).is_some_and(|tab| tab.confirm_close) {
                 self.show_close_dialog(ctx, id);
             } else {
-                self.show_save_dialog(ctx, id);
+                self.show_save_dialog(ctx, id, dialog_ime_input);
             }
+        } else if self.workspace.open.dialog {
+            self.show_open_dialog(ctx, dialog_ime_input);
         }
+        self.workspace.poll_open(ctx, composing || ime_events);
         if self.workspace.closing_all {
             ctx.request_repaint();
         }
